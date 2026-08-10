@@ -30,6 +30,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/auth-guard.js"></script>
+  <script src="assets/duration-utils.js"></script>
   <script>
     let cursos = [];
 
@@ -66,7 +67,7 @@
           <a class="curso-card" href="curso.html?id=${c.id_curso}">
             <span class="badge">${c.categoria ? escapeHtml(c.categoria) : "Sem categoria"}</span>
             <h3>${escapeHtml(c.nome)}</h3>
-            <span class="meta">${c.total_aulas} aula${c.total_aulas == 1 ? "" : "s"}</span>
+            <span class="meta">${c.total_aulas} aula${c.total_aulas == 1 ? "" : "s"} &middot; ${formatarCargaHoraria(c.duracao_total_segundos)}</span>
           </a>
         `).join("")}
       </div>`;

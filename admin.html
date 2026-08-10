@@ -49,6 +49,7 @@
               <th>Nome</th>
               <th>Categoria</th>
               <th>Aulas</th>
+              <th>Carga horária</th>
               <th class="col-actions-cell">Ações</th>
             </tr>
           </thead>
@@ -79,6 +80,10 @@
               <label for="novaAulaOrdem">Ordem</label>
               <input type="number" id="novaAulaOrdem" placeholder="1">
             </div>
+            <div>
+              <label for="novaAulaDuracao">Duração (mm:ss)</label>
+              <input type="text" id="novaAulaDuracao" placeholder="Ex: 12:34">
+            </div>
           </div>
           <label for="novaAulaUrl">URL do vídeo (Google Drive)</label>
           <input type="text" id="novaAulaUrl" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
@@ -90,7 +95,7 @@
 
         <div class="card" style="margin-top:20px;">
           <div class="section-title"><h2>Importar aulas via planilha (.xlsx)</h2></div>
-          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>. Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
+          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>, <strong>Duracao (mm:ss)</strong>. Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
           <div class="upload-box">
             <input type="file" id="arquivoXlsx" accept=".xlsx,.xls">
             <button class="btn" onclick="importarPlanilha()">Enviar planilha</button>
@@ -110,6 +115,7 @@
                 <th>Título</th>
                 <th>URL do vídeo</th>
                 <th>Descrição</th>
+                <th class="col-duracao">Duração</th>
                 <th class="col-actions-cell">Ações</th>
               </tr>
             </thead>
@@ -124,6 +130,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/auth-guard.js"></script>
+  <script src="assets/duration-utils.js"></script>
   <script>
     let cursos = [];
     let aulasCurso = [];
@@ -150,7 +157,7 @@
         .select("*");
 
       if (error) {
-        document.getElementById("tabelaCursos").innerHTML = `<tr><td colspan="4" class="error-msg">${error.message}</td></tr>`;
+        document.getElementById("tabelaCursos").innerHTML = `<tr><td colspan="5" class="error-msg">${error.message}</td></tr>`;
         return;
       }
       cursos = data || [];
@@ -161,7 +168,7 @@
     function renderTabelaCursos() {
       const tbody = document.getElementById("tabelaCursos");
       if (cursos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4">Nenhum curso cadastrado.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5">Nenhum curso cadastrado.</td></tr>`;
         return;
       }
       tbody.innerHTML = cursos.map(c => `
@@ -169,6 +176,7 @@
           <td><input type="text" value="${escapeHtml(c.nome)}" data-field="nome"></td>
           <td><input type="text" value="${escapeHtml(c.categoria || "")}" data-field="categoria"></td>
           <td>${c.total_aulas}</td>
+          <td>${formatarCargaHoraria(c.duracao_total_segundos)}</td>
           <td class="col-actions">
             <button class="btn-outline btn-sm" onclick="salvarCurso('${c.id_curso}', this)">Salvar</button>
             <button class="btn-danger" onclick="excluirCurso('${c.id_curso}')">Excluir</button>
@@ -248,7 +256,7 @@
         .order("ordem", { ascending: true });
 
       if (error) {
-        document.getElementById("tabelaAulas").innerHTML = `<tr><td colspan="6" class="error-msg">${error.message}</td></tr>`;
+        document.getElementById("tabelaAulas").innerHTML = `<tr><td colspan="7" class="error-msg">${error.message}</td></tr>`;
         return;
       }
       aulasCurso = data || [];
@@ -258,7 +266,7 @@
     function renderTabelaAulas() {
       const tbody = document.getElementById("tabelaAulas");
       if (aulasCurso.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6">Nenhuma aula cadastrada para este curso.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7">Nenhuma aula cadastrada para este curso.</td></tr>`;
         return;
       }
       tbody.innerHTML = aulasCurso.map(a => `
@@ -268,6 +276,7 @@
           <td><input type="text" value="${escapeHtml(a.titulo)}" data-field="titulo"></td>
           <td><input type="text" value="${escapeHtml(a.url_video)}" data-field="url_video"></td>
           <td><input type="text" value="${escapeHtml(a.descricao || "")}" data-field="descricao"></td>
+          <td class="col-duracao"><input type="text" value="${segundosParaMMSS(a.duracao_segundos)}" data-field="duracao" placeholder="mm:ss"></td>
           <td class="col-actions">
             <button class="btn-outline btn-sm" onclick="salvarAula(${a.id_aula}, this)">Salvar</button>
             <button class="btn-danger" onclick="excluirAula(${a.id_aula})">Excluir</button>
@@ -281,6 +290,7 @@
       const url_video = document.getElementById("novaAulaUrl").value.trim();
       const descricao = document.getElementById("novaAulaDesc").value.trim();
       const ordemInput = document.getElementById("novaAulaOrdem").value;
+      const duracaoInput = document.getElementById("novaAulaDuracao").value.trim();
       const msg = document.getElementById("msgErroAula");
       msg.textContent = "";
 
@@ -290,6 +300,7 @@
       }
 
       const ordem = ordemInput ? Number(ordemInput) : (aulasCurso.length > 0 ? Math.max(...aulasCurso.map(a => a.ordem)) + 1 : 1);
+      const duracao_segundos = parseDuracaoParaSegundos(duracaoInput);
 
       // id_aula não é enviado: o banco (identity) gera automaticamente.
       const { error } = await supabaseClient.from("aulas").insert({
@@ -297,7 +308,8 @@
         titulo,
         url_video,
         descricao: descricao || null,
-        ordem
+        ordem,
+        duracao_segundos
       });
 
       if (error) {
@@ -309,6 +321,7 @@
       document.getElementById("novaAulaUrl").value = "";
       document.getElementById("novaAulaDesc").value = "";
       document.getElementById("novaAulaOrdem").value = "";
+      document.getElementById("novaAulaDuracao").value = "";
       carregarAulas();
       carregarCursos();
     }
@@ -319,9 +332,10 @@
       const url_video = row.querySelector('[data-field="url_video"]').value.trim();
       const descricao = row.querySelector('[data-field="descricao"]').value.trim();
       const ordem = Number(row.querySelector('[data-field="ordem"]').value) || 0;
+      const duracao_segundos = parseDuracaoParaSegundos(row.querySelector('[data-field="duracao"]').value.trim());
 
       const { error } = await supabaseClient.from("aulas")
-        .update({ titulo, url_video, descricao: descricao || null, ordem })
+        .update({ titulo, url_video, descricao: descricao || null, ordem, duracao_segundos })
         .eq("id_aula", id);
 
       if (error) {
@@ -329,6 +343,7 @@
         return;
       }
       carregarAulas();
+      carregarCursos();
     }
 
     async function excluirAula(id) {
@@ -346,12 +361,12 @@
 
     function baixarModelo() {
       const dados = [
-        ["Titulo", "URL Video", "Descricao", "Ordem"],
-        ["Introdução ao curso", "https://drive.google.com/file/d/EXEMPLO_ID/view?usp=sharing", "Aula de boas-vindas ao curso", 1],
-        ["Segundo módulo", "https://drive.google.com/file/d/OUTRO_ID/view?usp=sharing", "Aprofundando no conteúdo", 2]
+        ["Titulo", "URL Video", "Descricao", "Ordem", "Duracao (mm:ss)"],
+        ["Introdução ao curso", "https://drive.google.com/file/d/EXEMPLO_ID/view?usp=sharing", "Aula de boas-vindas ao curso", 1, "12:34"],
+        ["Segundo módulo", "https://drive.google.com/file/d/OUTRO_ID/view?usp=sharing", "Aprofundando no conteúdo", 2, "8:05"]
       ];
       const ws = XLSX.utils.aoa_to_sheet(dados);
-      ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 40 }, { wch: 8 }];
+      ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 40 }, { wch: 8 }, { wch: 15 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Aulas");
       XLSX.writeFile(wb, "modelo_aulas.xlsx");
@@ -391,7 +406,9 @@
           const descricao = String(linha["Descricao"] ?? linha["descricao"] ?? "").trim();
           const ordemBruta = linha["Ordem"] ?? linha["ordem"];
           const ordem = ordemBruta !== undefined && ordemBruta !== "" ? Number(ordemBruta) : proximaOrdem++;
-          return { id_curso: Number(cursoSelecionadoId), titulo, url_video, descricao: descricao || null, ordem };
+          const duracaoBruta = linha["Duracao (mm:ss)"] ?? linha["Duracao"] ?? linha["duracao"] ?? "";
+          const duracao_segundos = parseDuracaoParaSegundos(duracaoBruta);
+          return { id_curso: Number(cursoSelecionadoId), titulo, url_video, descricao: descricao || null, ordem, duracao_segundos };
         }).filter(a => a.titulo && a.url_video);
 
         if (novasAulas.length === 0) {

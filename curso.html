@@ -32,10 +32,6 @@
         <div class="player-frame-wrap">
           <iframe id="videoFrame" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
         </div>
-        <div class="player-quality-hint">
-          Vídeo com qualidade baixa? O player do Google Drive ajusta a resolução automaticamente.
-          <a id="linkDriveOriginal" href="#" target="_blank" rel="noopener">Abrir no Google Drive (qualidade original) ↗</a>
-        </div>
         <h2 class="player-title" id="tituloAula"></h2>
         <div class="hint" id="posicaoAula"></div>
         <p class="player-desc" id="descAula"></p>
@@ -52,6 +48,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js"></script>
   <script src="assets/auth-guard.js"></script>
+  <script src="assets/duration-utils.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const idCurso = params.get("id");
@@ -59,26 +56,20 @@
     let aulas = [];
     let aulaAtualId = null;
 
-    function extrairDriveFileId(url) {
-      if (!url) return null;
-      let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) return match[1];
-      try {
-        const u = new URL(url);
-        const id = u.searchParams.get("id");
-        if (id) return id;
-      } catch (e) { /* ignore */ }
-      return null;
-    }
-
     function toDriveEmbedUrl(url) {
-      const id = extrairDriveFileId(url);
-      return id ? `https://drive.google.com/file/d/${id}/preview` : url;
-    }
-
-    function toDriveViewUrl(url) {
-      const id = extrairDriveFileId(url);
-      return id ? `https://drive.google.com/file/d/${id}/view` : url;
+      if (!url) return "";
+      let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (!match) {
+        try {
+          const u = new URL(url);
+          const id = u.searchParams.get("id");
+          if (id) match = [null, id];
+        } catch (e) { /* ignore */ }
+      }
+      if (match && match[1]) {
+        return `https://drive.google.com/file/d/${match[1]}/preview`;
+      }
+      return url;
     }
 
     function escapeHtml(str) {
@@ -135,7 +126,9 @@
       const termo = document.getElementById("buscaAula").value.trim().toLowerCase();
       const filtradas = aulas.filter(a => a.titulo.toLowerCase().includes(termo));
 
-      document.getElementById("contadorAulas").textContent = `${aulas.length} aula${aulas.length === 1 ? "" : "s"} no curso`;
+      const duracaoTotal = aulas.reduce((soma, a) => soma + (a.duracao_segundos || 0), 0);
+      document.getElementById("contadorAulas").textContent =
+        `${aulas.length} aula${aulas.length === 1 ? "" : "s"} no curso · ${formatarCargaHoraria(duracaoTotal)}`;
 
       const container = document.getElementById("listaAulas");
       if (filtradas.length === 0) {
@@ -158,7 +151,6 @@
       aulaAtualId = id;
 
       document.getElementById("videoFrame").src = toDriveEmbedUrl(aula.url_video);
-      document.getElementById("linkDriveOriginal").href = toDriveViewUrl(aula.url_video);
       document.getElementById("tituloAula").textContent = aula.titulo;
       document.getElementById("descAula").textContent = aula.descricao || "";
 
