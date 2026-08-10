@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administração - Plataforma de Treinamento</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><a href="dashboard.html" style="color:inherit;text-decoration:none;">&larr; Plataforma de Treinamento</a></div>
+    <nav>
+      <a href="dashboard.html">Cursos</a>
+      <a href="admin.html">Administração</a>
+      <span id="userEmail" class="hint"></span>
+      <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="admin-tabs">
+      <button class="tab-btn active" id="tabBtnCursos" onclick="mostrarAba('cursos')">Cursos</button>
+      <button class="tab-btn" id="tabBtnAulas" onclick="mostrarAba('aulas')">Aulas</button>
+    </div>
+
+    <!-- ================= ABA CURSOS ================= -->
+    <div id="abaCursos">
+      <div class="card">
+        <div class="section-title"><h2>Novo curso</h2></div>
+        <div class="form-row">
+          <div>
+            <label for="novoCursoNome">Nome</label>
+            <input type="text" id="novoCursoNome" placeholder="Ex: Onboarding de Vendas">
+          </div>
+          <div>
+            <label for="novoCursoCategoria">Categoria</label>
+            <input type="text" id="novoCursoCategoria" placeholder="Ex: Comercial">
+          </div>
+        </div>
+        <button class="btn" style="margin-top:14px;" onclick="criarCurso()">Adicionar curso</button>
+        <div class="error-msg" id="msgErroCurso"></div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <div class="section-title"><h2>Cursos cadastrados</h2></div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Categoria</th>
+              <th>Aulas</th>
+              <th class="col-actions-cell">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaCursos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ================= ABA AULAS ================= -->
+    <div id="abaAulas" style="display:none;">
+      <div class="card">
+        <div class="section-title"><h2>Selecionar curso</h2></div>
+        <select id="selectCursoAulas" onchange="onCursoAulasChange()">
+          <option value="">Selecione um curso...</option>
+        </select>
+      </div>
+
+      <div id="blocoAulas" style="display:none;">
+        <div class="card" style="margin-top:20px;">
+          <div class="section-title"><h2>Nova aula (entrada manual)</h2></div>
+          <div class="form-row">
+            <div>
+              <label for="novaAulaTitulo">Título</label>
+              <input type="text" id="novaAulaTitulo" placeholder="Ex: Introdução">
+            </div>
+            <div>
+              <label for="novaAulaOrdem">Ordem</label>
+              <input type="number" id="novaAulaOrdem" placeholder="1">
+            </div>
+          </div>
+          <label for="novaAulaUrl">URL do vídeo (Google Drive)</label>
+          <input type="text" id="novaAulaUrl" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
+          <label for="novaAulaDesc">Descrição</label>
+          <textarea id="novaAulaDesc" placeholder="Descrição da aula (opcional)"></textarea>
+          <button class="btn" style="margin-top:14px;" onclick="criarAula()">Adicionar aula</button>
+          <div class="error-msg" id="msgErroAula"></div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div class="section-title"><h2>Importar aulas via planilha (.xlsx)</h2></div>
+          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>. As aulas serão adicionadas ao curso selecionado acima.</p>
+          <div class="upload-box">
+            <input type="file" id="arquivoXlsx" accept=".xlsx,.xls">
+            <button class="btn" onclick="importarPlanilha()">Enviar planilha</button>
+            <button class="btn-outline" onclick="baixarModelo()">Baixar modelo de exemplo</button>
+          </div>
+          <div class="error-msg" id="msgErroImport"></div>
+          <div class="ok-msg" id="msgOkImport"></div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div class="section-title"><h2>Aulas do curso</h2></div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="col-ordem">Ordem</th>
+                <th>Título</th>
+                <th>URL do vídeo</th>
+                <th>Descrição</th>
+                <th class="col-actions-cell">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaAulas"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="assets/supabaseClient.js"></script>
+  <script src="assets/auth-guard.js"></script>
+  <script>
+    let cursos = [];
+    let aulasCurso = [];
+    let cursoSelecionadoId = "";
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str || "";
+      return div.innerHTML;
+    }
+
+    function mostrarAba(aba) {
+      document.getElementById("abaCursos").style.display = aba === "cursos" ? "block" : "none";
+      document.getElementById("abaAulas").style.display = aba === "aulas" ? "block" : "none";
+      document.getElementById("tabBtnCursos").classList.toggle("active", aba === "cursos");
+      document.getElementById("tabBtnAulas").classList.toggle("active", aba === "aulas");
+    }
+
+    // ---------------- CURSOS ----------------
+
+    async function carregarCursos() {
+      const { data, error } = await supabaseClient
+        .from("cursos_com_contagem")
+        .select("*");
+
+      if (error) {
+        document.getElementById("tabelaCursos").innerHTML = `<tr><td colspan="4" class="error-msg">${error.message}</td></tr>`;
+        return;
+      }
+      cursos = data || [];
+      renderTabelaCursos();
+      renderSelectCursos();
+    }
+
+    function renderTabelaCursos() {
+      const tbody = document.getElementById("tabelaCursos");
+      if (cursos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4">Nenhum curso cadastrado.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = cursos.map(c => `
+        <tr data-id="${c.id_curso}">
+          <td><input type="text" value="${escapeHtml(c.nome)}" data-field="nome"></td>
+          <td><input type="text" value="${escapeHtml(c.categoria || "")}" data-field="categoria"></td>
+          <td>${c.total_aulas}</td>
+          <td class="col-actions">
+            <button class="btn-outline btn-sm" onclick="salvarCurso('${c.id_curso}', this)">Salvar</button>
+            <button class="btn-danger" onclick="excluirCurso('${c.id_curso}')">Excluir</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function renderSelectCursos() {
+      const select = document.getElementById("selectCursoAulas");
+      const atual = select.value;
+      select.innerHTML = `<option value="">Selecione um curso...</option>` +
+        cursos.map(c => `<option value="${c.id_curso}">${escapeHtml(c.nome)}</option>`).join("");
+      if (atual) select.value = atual;
+    }
+
+    async function criarCurso() {
+      const nome = document.getElementById("novoCursoNome").value.trim();
+      const categoria = document.getElementById("novoCursoCategoria").value.trim();
+      const msg = document.getElementById("msgErroCurso");
+      msg.textContent = "";
+
+      if (!nome) {
+        msg.textContent = "Informe o nome do curso.";
+        return;
+      }
+
+      const { error } = await supabaseClient.from("cursos").insert({ nome, categoria: categoria || null });
+      if (error) {
+        msg.textContent = error.message;
+        return;
+      }
+      document.getElementById("novoCursoNome").value = "";
+      document.getElementById("novoCursoCategoria").value = "";
+      carregarCursos();
+    }
+
+    async function salvarCurso(id, btn) {
+      const row = btn.closest("tr");
+      const nome = row.querySelector('[data-field="nome"]').value.trim();
+      const categoria = row.querySelector('[data-field="categoria"]').value.trim();
+
+      const { error } = await supabaseClient.from("cursos")
+        .update({ nome, categoria: categoria || null })
+        .eq("id_curso", id);
+
+      if (error) {
+        alert("Erro ao salvar: " + error.message);
+        return;
+      }
+      carregarCursos();
+    }
+
+    async function excluirCurso(id) {
+      if (!confirm("Excluir este curso e todas as suas aulas?")) return;
+      const { error } = await supabaseClient.from("cursos").delete().eq("id_curso", id);
+      if (error) {
+        alert("Erro ao excluir: " + error.message);
+        return;
+      }
+      carregarCursos();
+    }
+
+    // ---------------- AULAS ----------------
+
+    function onCursoAulasChange() {
+      cursoSelecionadoId = document.getElementById("selectCursoAulas").value;
+      document.getElementById("blocoAulas").style.display = cursoSelecionadoId ? "block" : "none";
+      if (cursoSelecionadoId) carregarAulas();
+    }
+
+    async function carregarAulas() {
+      const { data, error } = await supabaseClient
+        .from("aulas")
+        .select("*")
+        .eq("id_curso", cursoSelecionadoId)
+        .order("ordem", { ascending: true });
+
+      if (error) {
+        document.getElementById("tabelaAulas").innerHTML = `<tr><td colspan="5" class="error-msg">${error.message}</td></tr>`;
+        return;
+      }
+      aulasCurso = data || [];
+      renderTabelaAulas();
+    }
+
+    function renderTabelaAulas() {
+      const tbody = document.getElementById("tabelaAulas");
+      if (aulasCurso.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5">Nenhuma aula cadastrada para este curso.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = aulasCurso.map(a => `
+        <tr data-id="${a.id_aula}">
+          <td class="col-ordem"><input type="number" value="${a.ordem}" data-field="ordem"></td>
+          <td><input type="text" value="${escapeHtml(a.titulo)}" data-field="titulo"></td>
+          <td><input type="text" value="${escapeHtml(a.url_video)}" data-field="url_video"></td>
+          <td><input type="text" value="${escapeHtml(a.descricao || "")}" data-field="descricao"></td>
+          <td class="col-actions">
+            <button class="btn-outline btn-sm" onclick="salvarAula('${a.id_aula}', this)">Salvar</button>
+            <button class="btn-danger" onclick="excluirAula('${a.id_aula}')">Excluir</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function criarAula() {
+      const titulo = document.getElementById("novaAulaTitulo").value.trim();
+      const url_video = document.getElementById("novaAulaUrl").value.trim();
+      const descricao = document.getElementById("novaAulaDesc").value.trim();
+      const ordemInput = document.getElementById("novaAulaOrdem").value;
+      const msg = document.getElementById("msgErroAula");
+      msg.textContent = "";
+
+      if (!titulo || !url_video) {
+        msg.textContent = "Preencha ao menos o título e a URL do vídeo.";
+        return;
+      }
+
+      const ordem = ordemInput ? Number(ordemInput) : (aulasCurso.length > 0 ? Math.max(...aulasCurso.map(a => a.ordem)) + 1 : 1);
+
+      const { error } = await supabaseClient.from("aulas").insert({
+        id_curso: cursoSelecionadoId,
+        titulo,
+        url_video,
+        descricao: descricao || null,
+        ordem
+      });
+
+      if (error) {
+        msg.textContent = error.message;
+        return;
+      }
+
+      document.getElementById("novaAulaTitulo").value = "";
+      document.getElementById("novaAulaUrl").value = "";
+      document.getElementById("novaAulaDesc").value = "";
+      document.getElementById("novaAulaOrdem").value = "";
+      carregarAulas();
+      carregarCursos();
+    }
+
+    async function salvarAula(id, btn) {
+      const row = btn.closest("tr");
+      const titulo = row.querySelector('[data-field="titulo"]').value.trim();
+      const url_video = row.querySelector('[data-field="url_video"]').value.trim();
+      const descricao = row.querySelector('[data-field="descricao"]').value.trim();
+      const ordem = Number(row.querySelector('[data-field="ordem"]').value) || 0;
+
+      const { error } = await supabaseClient.from("aulas")
+        .update({ titulo, url_video, descricao: descricao || null, ordem })
+        .eq("id_aula", id);
+
+      if (error) {
+        alert("Erro ao salvar: " + error.message);
+        return;
+      }
+      carregarAulas();
+    }
+
+    async function excluirAula(id) {
+      if (!confirm("Excluir esta aula?")) return;
+      const { error } = await supabaseClient.from("aulas").delete().eq("id_aula", id);
+      if (error) {
+        alert("Erro ao excluir: " + error.message);
+        return;
+      }
+      carregarAulas();
+      carregarCursos();
+    }
+
+    // ---------------- IMPORTAÇÃO XLSX ----------------
+
+    function baixarModelo() {
+      const dados = [
+        ["Titulo", "URL Video", "Descricao", "Ordem"],
+        ["Introdução ao curso", "https://drive.google.com/file/d/EXEMPLO_ID/view?usp=sharing", "Aula de boas-vindas ao curso", 1],
+        ["Segundo módulo", "https://drive.google.com/file/d/OUTRO_ID/view?usp=sharing", "Aprofundando no conteúdo", 2]
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(dados);
+      ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 40 }, { wch: 8 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Aulas");
+      XLSX.writeFile(wb, "modelo_aulas.xlsx");
+    }
+
+    async function importarPlanilha() {
+      const msgErro = document.getElementById("msgErroImport");
+      const msgOk = document.getElementById("msgOkImport");
+      msgErro.textContent = "";
+      msgOk.textContent = "";
+
+      if (!cursoSelecionadoId) {
+        msgErro.textContent = "Selecione um curso antes de importar.";
+        return;
+      }
+
+      const input = document.getElementById("arquivoXlsx");
+      const file = input.files[0];
+      if (!file) {
+        msgErro.textContent = "Escolha um arquivo .xlsx.";
+        return;
+      }
+
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const linhas = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+        let proximaOrdem = aulasCurso.length > 0 ? Math.max(...aulasCurso.map(a => a.ordem)) + 1 : 1;
+
+        const novasAulas = linhas.map((linha) => {
+          const titulo = String(linha["Titulo"] ?? linha["titulo"] ?? "").trim();
+          const url_video = String(linha["URL Video"] ?? linha["url_video"] ?? linha["Url Video"] ?? "").trim();
+          const descricao = String(linha["Descricao"] ?? linha["descricao"] ?? "").trim();
+          const ordemBruta = linha["Ordem"] ?? linha["ordem"];
+          const ordem = ordemBruta !== undefined && ordemBruta !== "" ? Number(ordemBruta) : proximaOrdem++;
+          return { id_curso: cursoSelecionadoId, titulo, url_video, descricao: descricao || null, ordem };
+        }).filter(a => a.titulo && a.url_video);
+
+        if (novasAulas.length === 0) {
+          msgErro.textContent = "Nenhuma linha válida encontrada (verifique as colunas Titulo e URL Video).";
+          return;
+        }
+
+        const { error } = await supabaseClient.from("aulas").insert(novasAulas);
+        if (error) {
+          msgErro.textContent = "Erro ao importar: " + error.message;
+          return;
+        }
+
+        msgOk.textContent = `${novasAulas.length} aula(s) importada(s) com sucesso!`;
+        input.value = "";
+        carregarAulas();
+        carregarCursos();
+      } catch (err) {
+        msgErro.textContent = "Erro ao ler a planilha: " + err.message;
+      }
+    }
+
+    (async () => {
+      await requireAuth();
+      initTopbarUser("userEmail");
+      carregarCursos();
+    })();
+  </script>
+</body>
+</html>

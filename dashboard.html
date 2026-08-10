@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cursos - Plataforma de Treinamento</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Plataforma de Treinamento</div>
+    <nav>
+      <a href="dashboard.html">Cursos</a>
+      <a href="admin.html">Administração</a>
+      <span id="userEmail" class="hint"></span>
+      <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="section-title">
+      <h2>Cursos disponíveis</h2>
+    </div>
+
+    <input type="text" class="search-box" id="busca" placeholder="Pesquisar curso por nome ou categoria..." oninput="renderCursos()">
+
+    <div id="listaCursos" class="loading">Carregando cursos...</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js"></script>
+  <script src="assets/auth-guard.js"></script>
+  <script>
+    let cursos = [];
+
+    async function carregarCursos() {
+      const { data, error } = await supabaseClient
+        .from("cursos_com_contagem")
+        .select("*");
+
+      const container = document.getElementById("listaCursos");
+      if (error) {
+        container.innerHTML = `<div class="error-msg">Erro ao carregar cursos: ${error.message}</div>`;
+        return;
+      }
+      cursos = data || [];
+      renderCursos();
+    }
+
+    function renderCursos() {
+      const termo = document.getElementById("busca").value.trim().toLowerCase();
+      const filtrados = cursos.filter(c =>
+        c.nome.toLowerCase().includes(termo) ||
+        (c.categoria || "").toLowerCase().includes(termo)
+      );
+
+      const container = document.getElementById("listaCursos");
+
+      if (filtrados.length === 0) {
+        container.innerHTML = `<div class="empty-state">Nenhum curso encontrado.</div>`;
+        return;
+      }
+
+      container.innerHTML = `<div class="grid-cursos">
+        ${filtrados.map(c => `
+          <a class="curso-card" href="curso.html?id=${c.id_curso}">
+            <span class="badge">${c.categoria ? escapeHtml(c.categoria) : "Sem categoria"}</span>
+            <h3>${escapeHtml(c.nome)}</h3>
+            <span class="meta">${c.total_aulas} aula${c.total_aulas == 1 ? "" : "s"}</span>
+          </a>
+        `).join("")}
+      </div>`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    (async () => {
+      await requireAuth();
+      initTopbarUser("userEmail");
+      carregarCursos();
+    })();
+  </script>
+</body>
+</html>

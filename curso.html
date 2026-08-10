@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curso - Plataforma de Treinamento</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><a href="dashboard.html" style="color:inherit;text-decoration:none;">&larr; Plataforma de Treinamento</a></div>
+    <nav>
+      <a href="dashboard.html">Cursos</a>
+      <a href="admin.html">Administração</a>
+      <span id="userEmail" class="hint"></span>
+      <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
+    </nav>
+  </div>
+
+  <div class="container">
+    <h2 id="nomeCurso" class="loading">Carregando curso...</h2>
+
+    <div id="playerLayout" class="player-layout" style="display:none;">
+      <div class="aulas-sidebar">
+        <h3 id="tituloSidebar">Aulas</h3>
+        <div class="contador" id="contadorAulas"></div>
+        <input type="text" id="buscaAula" placeholder="Pesquisar aula..." oninput="renderListaAulas()">
+        <div id="listaAulas" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="player-main">
+        <div class="player-frame-wrap">
+          <iframe id="videoFrame" src="" allow="autoplay" allowfullscreen></iframe>
+        </div>
+        <h2 class="player-title" id="tituloAula"></h2>
+        <div class="hint" id="posicaoAula"></div>
+        <p class="player-desc" id="descAula"></p>
+        <div class="player-controls">
+          <button class="btn-outline" id="btnAnterior" onclick="irAulaAnterior()">&larr; Aula anterior</button>
+          <button class="btn" id="btnProxima" onclick="irProximaAula()">Próxima aula &rarr;</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="semAulas" class="empty-state" style="display:none;">Este curso ainda não possui aulas cadastradas.</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js"></script>
+  <script src="assets/auth-guard.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const idCurso = params.get("id");
+
+    let aulas = [];
+    let aulaAtualId = null;
+
+    function toDriveEmbedUrl(url) {
+      if (!url) return "";
+      let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (!match) {
+        try {
+          const u = new URL(url);
+          const id = u.searchParams.get("id");
+          if (id) match = [null, id];
+        } catch (e) { /* ignore */ }
+      }
+      if (match && match[1]) {
+        return `https://drive.google.com/file/d/${match[1]}/preview`;
+      }
+      return url;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str || "";
+      return div.innerHTML;
+    }
+
+    async function carregarCurso() {
+      if (!idCurso) {
+        document.getElementById("nomeCurso").textContent = "Curso não informado.";
+        return;
+      }
+
+      const { data: curso, error: erroCurso } = await supabaseClient
+        .from("cursos")
+        .select("*")
+        .eq("id_curso", idCurso)
+        .single();
+
+      if (erroCurso || !curso) {
+        document.getElementById("nomeCurso").textContent = "Curso não encontrado.";
+        return;
+      }
+
+      document.getElementById("nomeCurso").textContent = curso.nome;
+      document.getElementById("tituloSidebar").textContent = curso.nome;
+      document.title = curso.nome + " - Plataforma de Treinamento";
+
+      const { data: dataAulas, error: erroAulas } = await supabaseClient
+        .from("aulas")
+        .select("*")
+        .eq("id_curso", idCurso)
+        .order("ordem", { ascending: true });
+
+      if (erroAulas) {
+        document.getElementById("nomeCurso").textContent = "Erro ao carregar aulas: " + erroAulas.message;
+        return;
+      }
+
+      aulas = dataAulas || [];
+
+      if (aulas.length === 0) {
+        document.getElementById("semAulas").style.display = "block";
+        return;
+      }
+
+      document.getElementById("playerLayout").style.display = "grid";
+      renderListaAulas();
+      selecionarAula(aulas[0].id_aula);
+    }
+
+    function renderListaAulas() {
+      const termo = document.getElementById("buscaAula").value.trim().toLowerCase();
+      const filtradas = aulas.filter(a => a.titulo.toLowerCase().includes(termo));
+
+      document.getElementById("contadorAulas").textContent = `${aulas.length} aula${aulas.length === 1 ? "" : "s"} no curso`;
+
+      const container = document.getElementById("listaAulas");
+      if (filtradas.length === 0) {
+        container.innerHTML = `<div class="hint">Nenhuma aula encontrada.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtradas.map(a => {
+        const idx = aulas.findIndex(x => x.id_aula === a.id_aula);
+        return `<div class="aula-item ${a.id_aula === aulaAtualId ? "active" : ""}" onclick="selecionarAula('${a.id_aula}')">
+          <span class="num">${idx + 1}.</span>
+          <span>${escapeHtml(a.titulo)}</span>
+        </div>`;
+      }).join("");
+    }
+
+    function selecionarAula(id) {
+      const aula = aulas.find(a => a.id_aula === id);
+      if (!aula) return;
+      aulaAtualId = id;
+
+      document.getElementById("videoFrame").src = toDriveEmbedUrl(aula.url_video);
+      document.getElementById("tituloAula").textContent = aula.titulo;
+      document.getElementById("descAula").textContent = aula.descricao || "";
+
+      const idx = aulas.findIndex(a => a.id_aula === id);
+      document.getElementById("posicaoAula").textContent = `Aula ${idx + 1} de ${aulas.length}`;
+
+      document.getElementById("btnAnterior").disabled = idx <= 0;
+      document.getElementById("btnProxima").disabled = idx >= aulas.length - 1;
+
+      renderListaAulas();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function irProximaAula() {
+      const idx = aulas.findIndex(a => a.id_aula === aulaAtualId);
+      if (idx < aulas.length - 1) selecionarAula(aulas[idx + 1].id_aula);
+    }
+
+    function irAulaAnterior() {
+      const idx = aulas.findIndex(a => a.id_aula === aulaAtualId);
+      if (idx > 0) selecionarAula(aulas[idx - 1].id_aula);
+    }
+
+    (async () => {
+      await requireAuth();
+      initTopbarUser("userEmail");
+      carregarCurso();
+    })();
+  </script>
+</body>
+</html>
