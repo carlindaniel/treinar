@@ -293,7 +293,7 @@
 
       // id_aula não é enviado: o banco (identity) gera automaticamente.
       const { error } = await supabaseClient.from("aulas").insert({
-        id_curso: cursoSelecionadoId,
+        id_curso: Number(cursoSelecionadoId),
         titulo,
         url_video,
         descricao: descricao || null,
@@ -391,7 +391,7 @@
           const descricao = String(linha["Descricao"] ?? linha["descricao"] ?? "").trim();
           const ordemBruta = linha["Ordem"] ?? linha["ordem"];
           const ordem = ordemBruta !== undefined && ordemBruta !== "" ? Number(ordemBruta) : proximaOrdem++;
-          return { id_curso: cursoSelecionadoId, titulo, url_video, descricao: descricao || null, ordem };
+          return { id_curso: Number(cursoSelecionadoId), titulo, url_video, descricao: descricao || null, ordem };
         }).filter(a => a.titulo && a.url_video);
 
         if (novasAulas.length === 0) {
