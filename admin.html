@@ -69,6 +69,7 @@
       <div id="blocoAulas" style="display:none;">
         <div class="card" style="margin-top:20px;">
           <div class="section-title"><h2>Nova aula (entrada manual)</h2></div>
+          <p class="hint">O identificador da aula (id_aula) é gerado automaticamente pelo banco de dados — você só preenche os campos abaixo.</p>
           <div class="form-row">
             <div>
               <label for="novaAulaTitulo">Título</label>
@@ -89,7 +90,7 @@
 
         <div class="card" style="margin-top:20px;">
           <div class="section-title"><h2>Importar aulas via planilha (.xlsx)</h2></div>
-          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>. As aulas serão adicionadas ao curso selecionado acima.</p>
+          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>. Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
           <div class="upload-box">
             <input type="file" id="arquivoXlsx" accept=".xlsx,.xls">
             <button class="btn" onclick="importarPlanilha()">Enviar planilha</button>
@@ -104,6 +105,7 @@
           <table class="data-table">
             <thead>
               <tr>
+                <th class="col-id">ID</th>
                 <th class="col-ordem">Ordem</th>
                 <th>Título</th>
                 <th>URL do vídeo</th>
@@ -246,7 +248,7 @@
         .order("ordem", { ascending: true });
 
       if (error) {
-        document.getElementById("tabelaAulas").innerHTML = `<tr><td colspan="5" class="error-msg">${error.message}</td></tr>`;
+        document.getElementById("tabelaAulas").innerHTML = `<tr><td colspan="6" class="error-msg">${error.message}</td></tr>`;
         return;
       }
       aulasCurso = data || [];
@@ -256,18 +258,19 @@
     function renderTabelaAulas() {
       const tbody = document.getElementById("tabelaAulas");
       if (aulasCurso.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5">Nenhuma aula cadastrada para este curso.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6">Nenhuma aula cadastrada para este curso.</td></tr>`;
         return;
       }
       tbody.innerHTML = aulasCurso.map(a => `
         <tr data-id="${a.id_aula}">
+          <td class="col-id">#${a.id_aula}</td>
           <td class="col-ordem"><input type="number" value="${a.ordem}" data-field="ordem"></td>
           <td><input type="text" value="${escapeHtml(a.titulo)}" data-field="titulo"></td>
           <td><input type="text" value="${escapeHtml(a.url_video)}" data-field="url_video"></td>
           <td><input type="text" value="${escapeHtml(a.descricao || "")}" data-field="descricao"></td>
           <td class="col-actions">
-            <button class="btn-outline btn-sm" onclick="salvarAula('${a.id_aula}', this)">Salvar</button>
-            <button class="btn-danger" onclick="excluirAula('${a.id_aula}')">Excluir</button>
+            <button class="btn-outline btn-sm" onclick="salvarAula(${a.id_aula}, this)">Salvar</button>
+            <button class="btn-danger" onclick="excluirAula(${a.id_aula})">Excluir</button>
           </td>
         </tr>
       `).join("");
@@ -288,6 +291,7 @@
 
       const ordem = ordemInput ? Number(ordemInput) : (aulasCurso.length > 0 ? Math.max(...aulasCurso.map(a => a.ordem)) + 1 : 1);
 
+      // id_aula não é enviado: o banco (identity) gera automaticamente.
       const { error } = await supabaseClient.from("aulas").insert({
         id_curso: cursoSelecionadoId,
         titulo,
@@ -379,6 +383,8 @@
 
         let proximaOrdem = aulasCurso.length > 0 ? Math.max(...aulasCurso.map(a => a.ordem)) + 1 : 1;
 
+        // id_aula nunca é lido da planilha: cada linha vira um insert sem id,
+        // e o banco (identity) atribui o próximo número automaticamente.
         const novasAulas = linhas.map((linha) => {
           const titulo = String(linha["Titulo"] ?? linha["titulo"] ?? "").trim();
           const url_video = String(linha["URL Video"] ?? linha["url_video"] ?? linha["Url Video"] ?? "").trim();

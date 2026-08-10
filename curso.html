@@ -135,7 +135,7 @@
 
       container.innerHTML = filtradas.map(a => {
         const idx = aulas.findIndex(x => x.id_aula === a.id_aula);
-        return `<div class="aula-item ${a.id_aula === aulaAtualId ? "active" : ""}" onclick="selecionarAula('${a.id_aula}')">
+        return `<div class="aula-item ${a.id_aula === aulaAtualId ? "active" : ""}" onclick="selecionarAula(${a.id_aula})">
           <span class="num">${idx + 1}.</span>
           <span>${escapeHtml(a.titulo)}</span>
         </div>`;
