@@ -17,7 +17,7 @@
     </nav>
   </div>
 
-  <div class="container">
+  <div class="container container-curso">
     <h2 id="nomeCurso" class="loading">Carregando curso...</h2>
 
     <div id="playerLayout" class="player-layout" style="display:none;">
@@ -30,7 +30,11 @@
 
       <div class="player-main">
         <div class="player-frame-wrap">
-          <iframe id="videoFrame" src="" allow="autoplay" allowfullscreen></iframe>
+          <iframe id="videoFrame" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <div class="player-quality-hint">
+          Vídeo com qualidade baixa? O player do Google Drive ajusta a resolução automaticamente.
+          <a id="linkDriveOriginal" href="#" target="_blank" rel="noopener">Abrir no Google Drive (qualidade original) ↗</a>
         </div>
         <h2 class="player-title" id="tituloAula"></h2>
         <div class="hint" id="posicaoAula"></div>
@@ -55,20 +59,26 @@
     let aulas = [];
     let aulaAtualId = null;
 
-    function toDriveEmbedUrl(url) {
-      if (!url) return "";
+    function extrairDriveFileId(url) {
+      if (!url) return null;
       let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (!match) {
-        try {
-          const u = new URL(url);
-          const id = u.searchParams.get("id");
-          if (id) match = [null, id];
-        } catch (e) { /* ignore */ }
-      }
-      if (match && match[1]) {
-        return `https://drive.google.com/file/d/${match[1]}/preview`;
-      }
-      return url;
+      if (match && match[1]) return match[1];
+      try {
+        const u = new URL(url);
+        const id = u.searchParams.get("id");
+        if (id) return id;
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+
+    function toDriveEmbedUrl(url) {
+      const id = extrairDriveFileId(url);
+      return id ? `https://drive.google.com/file/d/${id}/preview` : url;
+    }
+
+    function toDriveViewUrl(url) {
+      const id = extrairDriveFileId(url);
+      return id ? `https://drive.google.com/file/d/${id}/view` : url;
     }
 
     function escapeHtml(str) {
@@ -148,6 +158,7 @@
       aulaAtualId = id;
 
       document.getElementById("videoFrame").src = toDriveEmbedUrl(aula.url_video);
+      document.getElementById("linkDriveOriginal").href = toDriveViewUrl(aula.url_video);
       document.getElementById("tituloAula").textContent = aula.titulo;
       document.getElementById("descAula").textContent = aula.descricao || "";
 
