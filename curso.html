@@ -32,9 +32,25 @@
         <div class="player-frame-wrap">
           <iframe id="videoFrame" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
         </div>
-        <h2 class="player-title" id="tituloAula"></h2>
+        <div class="hint" style="margin-top:6px;">
+          Vídeo travou? <button class="btn-outline btn-sm" onclick="recarregarVideo()">Recarregar vídeo</button>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <h2 class="player-title" id="tituloAula"></h2>
+          <button class="btn-outline btn-sm" id="btnEditarAula" onclick="editarAula()">Editar</button>
+        </div>
         <div class="hint" id="posicaoAula"></div>
         <p class="player-desc" id="descAula"></p>
+
+        <div id="editAulaForm" style="display:none; margin-top:8px;">
+          <input type="text" id="editTituloInput" placeholder="Título da aula">
+          <textarea id="editDescInput" placeholder="Descrição da aula" style="margin-top:8px;"></textarea>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn" onclick="salvarEdicaoAula()">Salvar</button>
+            <button class="btn-outline" onclick="cancelarEdicaoAula()">Cancelar</button>
+          </div>
+        </div>
+
         <div class="player-controls">
           <button class="btn-outline" id="btnAnterior" onclick="irAulaAnterior()">&larr; Aula anterior</button>
           <button class="btn" id="btnProxima" onclick="irProximaAula()">Próxima aula &rarr;</button>
@@ -119,7 +135,14 @@
 
       document.getElementById("playerLayout").style.display = "grid";
       renderListaAulas();
-      selecionarAula(aulas[0].id_aula);
+
+      const ultimaAulaId = Number(localStorage.getItem(chaveUltimaAula()));
+      const ultimaAula = aulas.find(a => a.id_aula === ultimaAulaId);
+      selecionarAula(ultimaAula ? ultimaAula.id_aula : aulas[0].id_aula);
+    }
+
+    function chaveUltimaAula() {
+      return `ultimaAula_curso_${idCurso}`;
     }
 
     function renderListaAulas() {
@@ -149,6 +172,8 @@
       const aula = aulas.find(a => a.id_aula === id);
       if (!aula) return;
       aulaAtualId = id;
+      localStorage.setItem(chaveUltimaAula(), id);
+      cancelarEdicaoAula();
 
       document.getElementById("videoFrame").src = toDriveEmbedUrl(aula.url_video);
       document.getElementById("tituloAula").textContent = aula.titulo;
@@ -162,6 +187,60 @@
 
       renderListaAulas();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function editarAula() {
+      const aula = aulas.find(a => a.id_aula === aulaAtualId);
+      if (!aula) return;
+      document.getElementById("editTituloInput").value = aula.titulo;
+      document.getElementById("editDescInput").value = aula.descricao || "";
+      document.getElementById("tituloAula").style.display = "none";
+      document.getElementById("descAula").style.display = "none";
+      document.getElementById("btnEditarAula").style.display = "none";
+      document.getElementById("editAulaForm").style.display = "block";
+    }
+
+    function cancelarEdicaoAula() {
+      document.getElementById("tituloAula").style.display = "";
+      document.getElementById("descAula").style.display = "";
+      document.getElementById("btnEditarAula").style.display = "";
+      document.getElementById("editAulaForm").style.display = "none";
+    }
+
+    async function salvarEdicaoAula() {
+      const titulo = document.getElementById("editTituloInput").value.trim();
+      const descricao = document.getElementById("editDescInput").value.trim();
+      if (!titulo) {
+        alert("O título não pode ficar vazio.");
+        return;
+      }
+
+      const { error } = await supabaseClient
+        .from("aulas")
+        .update({ titulo, descricao: descricao || null })
+        .eq("id_aula", aulaAtualId);
+
+      if (error) {
+        alert("Erro ao salvar: " + error.message);
+        return;
+      }
+
+      const aula = aulas.find(a => a.id_aula === aulaAtualId);
+      aula.titulo = titulo;
+      aula.descricao = descricao;
+
+      document.getElementById("tituloAula").textContent = titulo;
+      document.getElementById("descAula").textContent = descricao;
+      renderListaAulas();
+      cancelarEdicaoAula();
+    }
+
+    function recarregarVideo() {
+      const aula = aulas.find(a => a.id_aula === aulaAtualId);
+      if (!aula) return;
+      const frame = document.getElementById("videoFrame");
+      frame.src = "about:blank";
+      setTimeout(() => { frame.src = toDriveEmbedUrl(aula.url_video); }, 50);
     }
 
     function irProximaAula() {
