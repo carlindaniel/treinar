@@ -273,13 +273,12 @@
       }
       tbody.innerHTML = aulasCurso.map(a => `
         <tr data-id="${a.id_aula}"
-            draggable="true"
             class="${a.id_aula === aulaArrastandoId ? "dragging" : ""}"
-            ondragstart="iniciarArrasto(event, ${a.id_aula})"
             ondragover="arrastarSobre(event, ${a.id_aula})"
-            ondrop="event.preventDefault()"
-            ondragend="finalizarArrasto()">
-          <td class="col-drag" title="Arrastar para reordenar">⠿</td>
+            ondrop="event.preventDefault()">
+          <td class="col-drag" draggable="true" title="Arrastar para reordenar"
+              ondragstart="iniciarArrasto(event, ${a.id_aula})"
+              ondragend="finalizarArrasto()">⠿</td>
           <td class="col-id">#${a.id_aula}</td>
           <td class="col-ordem">${a.ordem}</td>
           <td><input type="text" value="${escapeHtml(a.titulo)}" data-field="titulo"></td>
@@ -297,12 +296,9 @@
     let aulaArrastandoId = null;
 
     function iniciarArrasto(e, id) {
-      if (!e.target.classList.contains("col-drag")) {
-        e.preventDefault();
-        return;
-      }
       aulaArrastandoId = id;
       e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(id));
     }
 
     function arrastarSobre(e, sobreId) {
