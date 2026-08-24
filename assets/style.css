@@ -259,6 +259,8 @@ table.data-table .col-ordem { width: 70px; }
 table.data-table .col-duracao { width: 90px; }
 table.data-table .col-id { width: 60px; color: var(--text-dim); }
 table.data-table .col-actions-cell { width: 130px; }
+table.data-table .col-drag { width: 28px; text-align: center; cursor: grab; color: var(--text-dim); user-select: none; }
+table.data-table tr.dragging { opacity: 0.4; }
 
 .upload-box {
   border: 1px dashed var(--border);

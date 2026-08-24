@@ -107,9 +107,11 @@
 
         <div class="card" style="margin-top:20px;">
           <div class="section-title"><h2>Aulas do curso</h2></div>
+          <p class="hint">Arraste pela alça <strong>⠿</strong> para reordenar as aulas.</p>
           <table class="data-table">
             <thead>
               <tr>
+                <th class="col-drag"></th>
                 <th class="col-id">ID</th>
                 <th class="col-ordem">Ordem</th>
                 <th>Título</th>
@@ -266,13 +268,20 @@
     function renderTabelaAulas() {
       const tbody = document.getElementById("tabelaAulas");
       if (aulasCurso.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7">Nenhuma aula cadastrada para este curso.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8">Nenhuma aula cadastrada para este curso.</td></tr>`;
         return;
       }
       tbody.innerHTML = aulasCurso.map(a => `
-        <tr data-id="${a.id_aula}">
+        <tr data-id="${a.id_aula}"
+            draggable="true"
+            class="${a.id_aula === aulaArrastandoId ? "dragging" : ""}"
+            ondragstart="iniciarArrasto(event, ${a.id_aula})"
+            ondragover="arrastarSobre(event, ${a.id_aula})"
+            ondrop="event.preventDefault()"
+            ondragend="finalizarArrasto()">
+          <td class="col-drag" title="Arrastar para reordenar">⠿</td>
           <td class="col-id">#${a.id_aula}</td>
-          <td class="col-ordem"><input type="number" value="${a.ordem}" data-field="ordem"></td>
+          <td class="col-ordem">${a.ordem}</td>
           <td><input type="text" value="${escapeHtml(a.titulo)}" data-field="titulo"></td>
           <td><input type="text" value="${escapeHtml(a.url_video)}" data-field="url_video"></td>
           <td><input type="text" value="${escapeHtml(a.descricao || "")}" data-field="descricao"></td>
@@ -283,6 +292,47 @@
           </td>
         </tr>
       `).join("");
+    }
+
+    let aulaArrastandoId = null;
+
+    function iniciarArrasto(e, id) {
+      if (!e.target.classList.contains("col-drag")) {
+        e.preventDefault();
+        return;
+      }
+      aulaArrastandoId = id;
+      e.dataTransfer.effectAllowed = "move";
+    }
+
+    function arrastarSobre(e, sobreId) {
+      e.preventDefault();
+      if (aulaArrastandoId === null || aulaArrastandoId === sobreId) return;
+
+      const idxArrastando = aulasCurso.findIndex(a => a.id_aula === aulaArrastandoId);
+      const idxAlvo = aulasCurso.findIndex(a => a.id_aula === sobreId);
+      if (idxArrastando === -1 || idxAlvo === -1) return;
+
+      const [item] = aulasCurso.splice(idxArrastando, 1);
+      aulasCurso.splice(idxAlvo, 0, item);
+      renderTabelaAulas();
+    }
+
+    async function finalizarArrasto() {
+      if (aulaArrastandoId === null) return;
+      aulaArrastandoId = null;
+
+      aulasCurso.forEach((a, i) => { a.ordem = i + 1; });
+      renderTabelaAulas();
+
+      const resultados = await Promise.all(
+        aulasCurso.map(a => supabaseClient.from("aulas").update({ ordem: a.ordem }).eq("id_aula", a.id_aula))
+      );
+      const comErro = resultados.find(r => r.error);
+      if (comErro) {
+        alert("Erro ao salvar nova ordem: " + comErro.error.message);
+        carregarAulas();
+      }
     }
 
     async function criarAula() {
@@ -331,11 +381,10 @@
       const titulo = row.querySelector('[data-field="titulo"]').value.trim();
       const url_video = row.querySelector('[data-field="url_video"]').value.trim();
       const descricao = row.querySelector('[data-field="descricao"]').value.trim();
-      const ordem = Number(row.querySelector('[data-field="ordem"]').value) || 0;
       const duracao_segundos = parseDuracaoParaSegundos(row.querySelector('[data-field="duracao"]').value.trim());
 
       const { error } = await supabaseClient.from("aulas")
-        .update({ titulo, url_video, descricao: descricao || null, ordem, duracao_segundos })
+        .update({ titulo, url_video, descricao: descricao || null, duracao_segundos })
         .eq("id_aula", id);
 
       if (error) {
