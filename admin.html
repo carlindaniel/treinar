@@ -84,8 +84,15 @@
               <label for="novaAulaDuracao">Duração (mm:ss)</label>
               <input type="text" id="novaAulaDuracao" placeholder="Ex: 12:34">
             </div>
+            <div>
+              <label for="novaAulaTipo">Tipo</label>
+              <select id="novaAulaTipo">
+                <option value="video">Vídeo</option>
+                <option value="audio">Áudio</option>
+              </select>
+            </div>
           </div>
-          <label for="novaAulaUrl">URL do vídeo (Google Drive)</label>
+          <label for="novaAulaUrl">URL da mídia (Google Drive)</label>
           <input type="text" id="novaAulaUrl" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
           <label for="novaAulaDesc">Descrição</label>
           <textarea id="novaAulaDesc" placeholder="Descrição da aula (opcional)"></textarea>
@@ -95,7 +102,7 @@
 
         <div class="card" style="margin-top:20px;">
           <div class="section-title"><h2>Importar aulas via planilha (.xlsx)</h2></div>
-          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>, <strong>Duracao (mm:ss)</strong>. Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
+          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>, <strong>Duracao (mm:ss)</strong>, <strong>Tipo</strong> (opcional: "Video" ou "Audio", padrão Video). Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
           <div class="upload-box">
             <input type="file" id="arquivoXlsx" accept=".xlsx,.xls">
             <button class="btn" onclick="importarPlanilha()">Enviar planilha</button>
@@ -115,7 +122,8 @@
                 <th class="col-id">ID</th>
                 <th class="col-ordem">Ordem</th>
                 <th>Título</th>
-                <th>URL do vídeo</th>
+                <th class="col-tipo">Tipo</th>
+                <th>URL da mídia</th>
                 <th>Descrição</th>
                 <th class="col-duracao">Duração</th>
                 <th class="col-actions-cell">Ações</th>
@@ -258,7 +266,7 @@
         .order("ordem", { ascending: true });
 
       if (error) {
-        document.getElementById("tabelaAulas").innerHTML = `<tr><td colspan="7" class="error-msg">${error.message}</td></tr>`;
+        document.getElementById("tabelaAulas").innerHTML = `<tr><td colspan="9" class="error-msg">${error.message}</td></tr>`;
         return;
       }
       aulasCurso = data || [];
@@ -268,7 +276,7 @@
     function renderTabelaAulas() {
       const tbody = document.getElementById("tabelaAulas");
       if (aulasCurso.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8">Nenhuma aula cadastrada para este curso.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9">Nenhuma aula cadastrada para este curso.</td></tr>`;
         return;
       }
       tbody.innerHTML = aulasCurso.map(a => `
@@ -282,6 +290,12 @@
           <td class="col-id">#${a.id_aula}</td>
           <td class="col-ordem">${a.ordem}</td>
           <td><input type="text" value="${escapeHtml(a.titulo)}" data-field="titulo"></td>
+          <td class="col-tipo">
+            <select data-field="tipo_midia">
+              <option value="video" ${a.tipo_midia !== "audio" ? "selected" : ""}>Vídeo</option>
+              <option value="audio" ${a.tipo_midia === "audio" ? "selected" : ""}>Áudio</option>
+            </select>
+          </td>
           <td><input type="text" value="${escapeHtml(a.url_video)}" data-field="url_video"></td>
           <td><input type="text" value="${escapeHtml(a.descricao || "")}" data-field="descricao"></td>
           <td class="col-duracao"><input type="text" value="${segundosParaMMSS(a.duracao_segundos)}" data-field="duracao" placeholder="mm:ss"></td>
@@ -337,11 +351,12 @@
       const descricao = document.getElementById("novaAulaDesc").value.trim();
       const ordemInput = document.getElementById("novaAulaOrdem").value;
       const duracaoInput = document.getElementById("novaAulaDuracao").value.trim();
+      const tipo_midia = document.getElementById("novaAulaTipo").value;
       const msg = document.getElementById("msgErroAula");
       msg.textContent = "";
 
       if (!titulo || !url_video) {
-        msg.textContent = "Preencha ao menos o título e a URL do vídeo.";
+        msg.textContent = "Preencha ao menos o título e a URL da mídia.";
         return;
       }
 
@@ -355,7 +370,8 @@
         url_video,
         descricao: descricao || null,
         ordem,
-        duracao_segundos
+        duracao_segundos,
+        tipo_midia
       });
 
       if (error) {
@@ -368,6 +384,7 @@
       document.getElementById("novaAulaDesc").value = "";
       document.getElementById("novaAulaOrdem").value = "";
       document.getElementById("novaAulaDuracao").value = "";
+      document.getElementById("novaAulaTipo").value = "video";
       carregarAulas();
       carregarCursos();
     }
@@ -378,9 +395,10 @@
       const url_video = row.querySelector('[data-field="url_video"]').value.trim();
       const descricao = row.querySelector('[data-field="descricao"]').value.trim();
       const duracao_segundos = parseDuracaoParaSegundos(row.querySelector('[data-field="duracao"]').value.trim());
+      const tipo_midia = row.querySelector('[data-field="tipo_midia"]').value;
 
       const { error } = await supabaseClient.from("aulas")
-        .update({ titulo, url_video, descricao: descricao || null, duracao_segundos })
+        .update({ titulo, url_video, descricao: descricao || null, duracao_segundos, tipo_midia })
         .eq("id_aula", id);
 
       if (error) {
@@ -406,12 +424,12 @@
 
     function baixarModelo() {
       const dados = [
-        ["Titulo", "URL Video", "Descricao", "Ordem", "Duracao (mm:ss)"],
-        ["Introdução ao curso", "https://drive.google.com/file/d/EXEMPLO_ID/view?usp=sharing", "Aula de boas-vindas ao curso", 1, "12:34"],
-        ["Segundo módulo", "https://drive.google.com/file/d/OUTRO_ID/view?usp=sharing", "Aprofundando no conteúdo", 2, "8:05"]
+        ["Titulo", "URL Video", "Descricao", "Ordem", "Duracao (mm:ss)", "Tipo"],
+        ["Introdução ao curso", "https://drive.google.com/file/d/EXEMPLO_ID/view?usp=sharing", "Aula de boas-vindas ao curso", 1, "12:34", "Video"],
+        ["Segundo módulo (podcast)", "https://drive.google.com/file/d/OUTRO_ID/view?usp=sharing", "Aprofundando no conteúdo", 2, "8:05", "Audio"]
       ];
       const ws = XLSX.utils.aoa_to_sheet(dados);
-      ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 40 }, { wch: 8 }, { wch: 15 }];
+      ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 40 }, { wch: 8 }, { wch: 15 }, { wch: 10 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Aulas");
       XLSX.writeFile(wb, "modelo_aulas.xlsx");
@@ -453,7 +471,9 @@
           const ordem = ordemBruta !== undefined && ordemBruta !== "" ? Number(ordemBruta) : proximaOrdem++;
           const duracaoBruta = linha["Duracao (mm:ss)"] ?? linha["Duracao"] ?? linha["duracao"] ?? "";
           const duracao_segundos = parseDuracaoParaSegundos(duracaoBruta);
-          return { id_curso: Number(cursoSelecionadoId), titulo, url_video, descricao: descricao || null, ordem, duracao_segundos };
+          const tipoBruto = String(linha["Tipo"] ?? linha["tipo"] ?? "").trim().toLowerCase();
+          const tipo_midia = tipoBruto === "audio" ? "audio" : "video";
+          return { id_curso: Number(cursoSelecionadoId), titulo, url_video, descricao: descricao || null, ordem, duracao_segundos, tipo_midia };
         }).filter(a => a.titulo && a.url_video);
 
         if (novasAulas.length === 0) {

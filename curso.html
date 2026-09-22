@@ -29,11 +29,11 @@
       </div>
 
       <div class="player-main">
-        <div class="player-frame-wrap">
+        <div class="player-frame-wrap" id="playerFrameWrap">
           <iframe id="videoFrame" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
         </div>
         <div class="hint" style="margin-top:6px;">
-          Vídeo travou? <button class="btn-outline btn-sm" onclick="recarregarVideo()">Recarregar vídeo</button>
+          Mídia travou? <button class="btn-outline btn-sm" onclick="recarregarVideo()">Recarregar mídia</button>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
           <h2 class="player-title" id="tituloAula"></h2>
@@ -163,7 +163,7 @@
         const idx = aulas.findIndex(x => x.id_aula === a.id_aula);
         return `<div class="aula-item ${a.id_aula === aulaAtualId ? "active" : ""}" onclick="selecionarAula(${a.id_aula})">
           <span class="num">${idx + 1}.</span>
-          <span>${escapeHtml(a.titulo)}</span>
+          <span>${a.tipo_midia === "audio" ? "🎧 " : ""}${escapeHtml(a.titulo)}</span>
         </div>`;
       }).join("");
     }
@@ -176,6 +176,7 @@
       cancelarEdicaoAula();
 
       document.getElementById("videoFrame").src = toDriveEmbedUrl(aula.url_video);
+      document.getElementById("playerFrameWrap").classList.toggle("audio-wrap", aula.tipo_midia === "audio");
       document.getElementById("tituloAula").textContent = aula.titulo;
       document.getElementById("descAula").textContent = aula.descricao || "";
 
