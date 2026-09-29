@@ -31,6 +31,7 @@
       <div class="player-main">
         <div class="player-frame-wrap" id="playerFrameWrap">
           <iframe id="videoFrame" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+          <audio id="audioPlayer" controls preload="auto" style="display:none;"></audio>
         </div>
         <div class="hint" style="margin-top:6px;">
           Mídia travou? <button class="btn-outline btn-sm" onclick="recarregarVideo()">Recarregar mídia</button>
@@ -72,20 +73,28 @@
     let aulas = [];
     let aulaAtualId = null;
 
-    function toDriveEmbedUrl(url) {
-      if (!url) return "";
+    function extrairDriveId(url) {
+      if (!url) return null;
       let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (!match) {
-        try {
-          const u = new URL(url);
-          const id = u.searchParams.get("id");
-          if (id) match = [null, id];
-        } catch (e) { /* ignore */ }
-      }
-      if (match && match[1]) {
-        return `https://drive.google.com/file/d/${match[1]}/preview`;
-      }
-      return url;
+      if (match && match[1]) return match[1];
+      try {
+        const u = new URL(url);
+        const id = u.searchParams.get("id");
+        if (id) return id;
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+
+    function toDriveEmbedUrl(url) {
+      const id = extrairDriveId(url);
+      return id ? `https://drive.google.com/file/d/${id}/preview` : url;
+    }
+
+    // Link direto (sem a UI do Drive) — carrega e dá seek muito mais rápido
+    // que o /preview, que é o motivo do áudio parecer lento comparado ao vídeo.
+    function toDriveDirectUrl(url) {
+      const id = extrairDriveId(url);
+      return id ? `https://drive.google.com/uc?export=download&id=${id}` : url;
     }
 
     function escapeHtml(str) {
@@ -175,8 +184,26 @@
       localStorage.setItem(chaveUltimaAula(), id);
       cancelarEdicaoAula();
 
-      document.getElementById("videoFrame").src = toDriveEmbedUrl(aula.url_video);
-      document.getElementById("playerFrameWrap").classList.toggle("audio-wrap", aula.tipo_midia === "audio");
+      const frame = document.getElementById("videoFrame");
+      const audio = document.getElementById("audioPlayer");
+      const ehAudio = aula.tipo_midia === "audio";
+
+      document.getElementById("playerFrameWrap").classList.toggle("audio-wrap", ehAudio);
+
+      if (ehAudio) {
+        frame.src = "about:blank";
+        frame.style.display = "none";
+        audio.style.display = "block";
+        audio.src = toDriveDirectUrl(aula.url_video);
+        audio.load();
+      } else {
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.style.display = "none";
+        frame.style.display = "block";
+        frame.src = toDriveEmbedUrl(aula.url_video);
+      }
+
       document.getElementById("tituloAula").textContent = aula.titulo;
       document.getElementById("descAula").textContent = aula.descricao || "";
 
@@ -239,6 +266,12 @@
     function recarregarVideo() {
       const aula = aulas.find(a => a.id_aula === aulaAtualId);
       if (!aula) return;
+      if (aula.tipo_midia === "audio") {
+        const audio = document.getElementById("audioPlayer");
+        audio.src = "";
+        setTimeout(() => { audio.src = toDriveDirectUrl(aula.url_video); audio.load(); }, 50);
+        return;
+      }
       const frame = document.getElementById("videoFrame");
       frame.src = "about:blank";
       setTimeout(() => { frame.src = toDriveEmbedUrl(aula.url_video); }, 50);

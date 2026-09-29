@@ -81,8 +81,8 @@
               <input type="number" id="novaAulaOrdem" placeholder="1">
             </div>
             <div>
-              <label for="novaAulaDuracao">Duração (mm:ss)</label>
-              <input type="text" id="novaAulaDuracao" placeholder="Ex: 12:34">
+              <label for="novaAulaDuracao">Duração (mm:ss ou h:mm:ss)</label>
+              <input type="text" id="novaAulaDuracao" placeholder="Ex: 12:34 ou 1:05:00">
             </div>
             <div>
               <label for="novaAulaTipo">Tipo</label>
@@ -102,7 +102,7 @@
 
         <div class="card" style="margin-top:20px;">
           <div class="section-title"><h2>Importar aulas via planilha (.xlsx)</h2></div>
-          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>, <strong>Duracao (mm:ss)</strong>, <strong>Tipo</strong> (opcional: "Video" ou "Audio", padrão Video). Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
+          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>, <strong>Duracao (mm:ss ou h:mm:ss)</strong>, <strong>Tipo</strong> (opcional: "Video" ou "Audio", padrão Video). Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
           <div class="upload-box">
             <input type="file" id="arquivoXlsx" accept=".xlsx,.xls">
             <button class="btn" onclick="importarPlanilha()">Enviar planilha</button>
@@ -298,7 +298,7 @@
           </td>
           <td><input type="text" value="${escapeHtml(a.url_video)}" data-field="url_video"></td>
           <td><input type="text" value="${escapeHtml(a.descricao || "")}" data-field="descricao"></td>
-          <td class="col-duracao"><input type="text" value="${segundosParaMMSS(a.duracao_segundos)}" data-field="duracao" placeholder="mm:ss"></td>
+          <td class="col-duracao"><input type="text" value="${segundosParaMMSS(a.duracao_segundos)}" data-field="duracao" placeholder="mm:ss ou h:mm:ss"></td>
           <td class="col-actions">
             <button class="btn-outline btn-sm" onclick="salvarAula(${a.id_aula}, this)">Salvar</button>
             <button class="btn-danger" onclick="excluirAula(${a.id_aula})">Excluir</button>
@@ -424,9 +424,9 @@
 
     function baixarModelo() {
       const dados = [
-        ["Titulo", "URL Video", "Descricao", "Ordem", "Duracao (mm:ss)", "Tipo"],
+        ["Titulo", "URL Video", "Descricao", "Ordem", "Duracao (mm:ss ou h:mm:ss)", "Tipo"],
         ["Introdução ao curso", "https://drive.google.com/file/d/EXEMPLO_ID/view?usp=sharing", "Aula de boas-vindas ao curso", 1, "12:34", "Video"],
-        ["Segundo módulo (podcast)", "https://drive.google.com/file/d/OUTRO_ID/view?usp=sharing", "Aprofundando no conteúdo", 2, "8:05", "Audio"]
+        ["Segundo módulo (podcast)", "https://drive.google.com/file/d/OUTRO_ID/view?usp=sharing", "Aprofundando no conteúdo", 2, "1:05:00", "Audio"]
       ];
       const ws = XLSX.utils.aoa_to_sheet(dados);
       ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 40 }, { wch: 8 }, { wch: 15 }, { wch: 10 }];
@@ -469,7 +469,7 @@
           const descricao = String(linha["Descricao"] ?? linha["descricao"] ?? "").trim();
           const ordemBruta = linha["Ordem"] ?? linha["ordem"];
           const ordem = ordemBruta !== undefined && ordemBruta !== "" ? Number(ordemBruta) : proximaOrdem++;
-          const duracaoBruta = linha["Duracao (mm:ss)"] ?? linha["Duracao"] ?? linha["duracao"] ?? "";
+          const duracaoBruta = linha["Duracao (mm:ss ou h:mm:ss)"] ?? linha["Duracao (mm:ss)"] ?? linha["Duracao"] ?? linha["duracao"] ?? "";
           const duracao_segundos = parseDuracaoParaSegundos(duracaoBruta);
           const tipoBruto = String(linha["Tipo"] ?? linha["tipo"] ?? "").trim().toLowerCase();
           const tipo_midia = tipoBruto === "audio" ? "audio" : "video";

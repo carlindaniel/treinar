@@ -232,7 +232,8 @@ button {
 .player-main { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
 .player-frame-wrap { position: relative; width: 100%; padding-top: 56.25%; background: #000; border-radius: 8px; overflow: hidden; }
 .player-frame-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.player-frame-wrap.audio-wrap { padding-top: 0; height: 130px; background: var(--bg-elev-2); }
+.player-frame-wrap.audio-wrap { position: static; padding-top: 0; height: auto; background: var(--bg-elev-2); border-radius: 8px; padding: 24px 16px; }
+.player-frame-wrap.audio-wrap audio { width: 100%; display: block; }
 
 .player-title { margin: 16px 0 4px; font-size: 1.2rem; }
 .player-desc { color: var(--text-dim); font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
