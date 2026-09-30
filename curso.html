@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Curso - Plataforma de Treinamento</title>
-<link rel="stylesheet" href="assets/style.css?v=2">
+<link rel="stylesheet" href="assets/style.css?v=3">
 </head>
 <body>
   <div class="topbar">
@@ -31,6 +31,7 @@
       <div class="player-main">
         <div class="player-frame-wrap" id="playerFrameWrap">
           <iframe id="videoFrame" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+          <video id="videoPlayer" controls playsinline webkit-playsinline preload="metadata" style="display:none;"></video>
           <audio id="audioPlayer" controls preload="auto" style="display:none;"></audio>
         </div>
         <div class="hint" style="margin-top:6px;">
@@ -95,6 +96,50 @@
     function toDriveDirectUrl(url) {
       const id = extrairDriveId(url);
       return id ? `https://drive.google.com/uc?export=download&id=${id}` : url;
+    }
+
+    // Chave da API do Google Drive: permite tocar o arquivo direto na tag <video>/<audio>
+    // (reprodução por partes, funciona bem no iPhone). Sem ela, cai no /preview.
+    const driveApiKey = "AIzaSyCaCTS_ltXKC89MBawEO_PnPrv0UL0KZIo";
+
+    function toDriveApiUrl(url) {
+      const id = extrairDriveId(url);
+      if (!id) return url;
+      return driveApiKey
+        ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${encodeURIComponent(driveApiKey)}`
+        : toDriveDirectUrl(url);
+    }
+
+    // Mostra a mídia da aula: <video>/<audio> via API; se falhar, cai no iframe /preview.
+    function mostrarMidia(aula) {
+      const wrap = document.getElementById("playerFrameWrap");
+      const frame = document.getElementById("videoFrame");
+      const video = document.getElementById("videoPlayer");
+      const audio = document.getElementById("audioPlayer");
+      const ehAudio = aula.tipo_midia === "audio";
+      const el = ehAudio ? audio : video;
+      const outro = ehAudio ? video : audio;
+
+      outro.pause();
+      outro.removeAttribute("src");
+      outro.onerror = null;
+      outro.style.display = "none";
+      frame.src = "about:blank";
+      frame.style.display = "none";
+      wrap.classList.toggle("audio-wrap", ehAudio);
+
+      el.onerror = () => {
+        el.pause();
+        el.onerror = null;
+        el.removeAttribute("src");
+        el.style.display = "none";
+        wrap.classList.remove("audio-wrap");
+        frame.style.display = "block";
+        frame.src = toDriveEmbedUrl(aula.url_video);
+      };
+      el.style.display = "block";
+      el.src = toDriveApiUrl(aula.url_video);
+      el.load();
     }
 
     function escapeHtml(str) {
@@ -184,25 +229,7 @@
       localStorage.setItem(chaveUltimaAula(), id);
       cancelarEdicaoAula();
 
-      const frame = document.getElementById("videoFrame");
-      const audio = document.getElementById("audioPlayer");
-      const ehAudio = aula.tipo_midia === "audio";
-
-      document.getElementById("playerFrameWrap").classList.toggle("audio-wrap", ehAudio);
-
-      if (ehAudio) {
-        frame.src = "about:blank";
-        frame.style.display = "none";
-        audio.style.display = "block";
-        audio.src = toDriveDirectUrl(aula.url_video);
-        audio.load();
-      } else {
-        audio.pause();
-        audio.removeAttribute("src");
-        audio.style.display = "none";
-        frame.style.display = "block";
-        frame.src = toDriveEmbedUrl(aula.url_video);
-      }
+      mostrarMidia(aula);
 
       document.getElementById("tituloAula").textContent = aula.titulo;
       document.getElementById("descAula").textContent = aula.descricao || "";
@@ -266,15 +293,7 @@
     function recarregarVideo() {
       const aula = aulas.find(a => a.id_aula === aulaAtualId);
       if (!aula) return;
-      if (aula.tipo_midia === "audio") {
-        const audio = document.getElementById("audioPlayer");
-        audio.src = "";
-        setTimeout(() => { audio.src = toDriveDirectUrl(aula.url_video); audio.load(); }, 50);
-        return;
-      }
-      const frame = document.getElementById("videoFrame");
-      frame.src = "about:blank";
-      setTimeout(() => { frame.src = toDriveEmbedUrl(aula.url_video); }, 50);
+      mostrarMidia(aula);
     }
 
     function irProximaAula() {
