@@ -81,8 +81,8 @@
               <input type="number" id="novaAulaOrdem" placeholder="1">
             </div>
             <div>
-              <label for="novaAulaDuracao">Duração (mm:ss ou h:mm:ss)</label>
-              <input type="text" id="novaAulaDuracao" placeholder="Ex: 12:34 ou 1:05:00">
+              <label for="novaAulaDuracao">Duração (hh:mm:ss)</label>
+              <input type="text" id="novaAulaDuracao" placeholder="Ex: 00:12:34 ou 01:05:00">
             </div>
             <div>
               <label for="novaAulaTipo">Tipo</label>
@@ -102,7 +102,7 @@
 
         <div class="card" style="margin-top:20px;">
           <div class="section-title"><h2>Importar aulas via planilha (.xlsx)</h2></div>
-          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>, <strong>Duracao (mm:ss ou h:mm:ss)</strong>, <strong>Tipo</strong> (opcional: "Video" ou "Audio", padrão Video). Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
+          <p class="hint">Colunas esperadas: <strong>Titulo</strong>, <strong>URL Video</strong>, <strong>Descricao</strong>, <strong>Ordem</strong>, <strong>Duracao (hh:mm:ss)</strong>, <strong>Tipo</strong> (opcional: "Video" ou "Audio", padrão Video). Não inclua coluna de id — ele é atribuído automaticamente. As aulas serão adicionadas ao curso selecionado acima.</p>
           <div class="upload-box">
             <input type="file" id="arquivoXlsx" accept=".xlsx,.xls">
             <button class="btn" onclick="importarPlanilha()">Enviar planilha</button>
@@ -140,7 +140,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="assets/supabaseClient.js?v=2"></script>
   <script src="assets/auth-guard.js?v=2"></script>
-  <script src="assets/duration-utils.js?v=2"></script>
+  <script src="assets/duration-utils.js?v=3"></script>
   <script>
     let cursos = [];
     let aulasCurso = [];
@@ -298,7 +298,7 @@
           </td>
           <td><input type="text" value="${escapeHtml(a.url_video)}" data-field="url_video"></td>
           <td><input type="text" value="${escapeHtml(a.descricao || "")}" data-field="descricao"></td>
-          <td class="col-duracao"><input type="text" value="${segundosParaMMSS(a.duracao_segundos)}" data-field="duracao" placeholder="mm:ss ou h:mm:ss"></td>
+          <td class="col-duracao"><input type="text" value="${segundosParaHHMMSS(a.duracao_segundos)}" data-field="duracao" placeholder="00:00:00"></td>
           <td class="col-actions">
             <button class="btn-outline btn-sm" onclick="salvarAula(${a.id_aula}, this)">Salvar</button>
             <button class="btn-danger" onclick="excluirAula(${a.id_aula})">Excluir</button>

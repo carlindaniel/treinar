@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Curso - Plataforma de Treinamento</title>
-<link rel="stylesheet" href="assets/style.css?v=3">
+<link rel="stylesheet" href="assets/style.css?v=4">
 </head>
 <body>
   <div class="topbar">
@@ -47,6 +47,12 @@
         <div id="editAulaForm" style="display:none; margin-top:8px;">
           <input type="text" id="editTituloInput" placeholder="Título da aula">
           <textarea id="editDescInput" placeholder="Descrição da aula" style="margin-top:8px;"></textarea>
+          <label for="editDuracaoInput" class="hint" style="display:block; margin-top:8px;">Duração (hh:mm:ss)</label>
+          <input type="text" id="editDuracaoInput" placeholder="00:00:00" inputmode="numeric" autocomplete="off">
+          <div class="hint" style="margin-top:8px;">Cor de fundo na lista</div>
+          <div class="swatches" id="swatchesBg"></div>
+          <div class="hint" style="margin-top:8px;">Cor da fonte na lista</div>
+          <div class="swatches" id="swatchesFg"></div>
           <div style="display:flex; gap:8px; margin-top:8px;">
             <button class="btn" onclick="salvarEdicaoAula()">Salvar</button>
             <button class="btn-outline" onclick="cancelarEdicaoAula()">Cancelar</button>
@@ -66,7 +72,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js?v=2"></script>
   <script src="assets/auth-guard.js?v=2"></script>
-  <script src="assets/duration-utils.js?v=2"></script>
+  <script src="assets/duration-utils.js?v=3"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const idCurso = params.get("id");
@@ -142,6 +148,35 @@
       el.load();
     }
 
+    // ---- Cores personalizadas da aula (coluna jsonb "estilo": {"bg":"#hex","fg":"#hex"}) ----
+    const CORES_FUNDO = ["", "#6c5ce7", "#0984e3", "#00b894", "#e17055", "#d63031", "#e84393", "#fdcb6e", "#2d3436", "#ffffff"];
+    const CORES_FONTE = ["", "#ffffff", "#000000", "#fdcb6e", "#55efc4", "#74b9ff", "#fd79a8", "#ff7675", "#a29bfe", "#b2bec3"];
+    let corFundoEdit = "", corFonteEdit = "";
+
+    function corValida(v) {
+      return typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : "";
+    }
+
+    function estiloAulaCss(aula) {
+      const e = aula.estilo || {};
+      const bg = corValida(e.bg), fg = corValida(e.fg);
+      return (bg ? `background:${bg};` : "") + (fg ? `color:${fg};` : "");
+    }
+
+    function renderSwatches(idEl, cores, selecionada, aoEscolher) {
+      const el = document.getElementById(idEl);
+      el.innerHTML = cores.map(cor =>
+        `<button type="button" class="swatch ${cor === selecionada ? "sel" : ""} ${cor ? "" : "swatch-padrao"}"
+           data-cor="${cor}" title="${cor || "Padrão"}" style="${cor ? `background:${cor};` : ""}"></button>`
+      ).join("");
+      el.querySelectorAll(".swatch").forEach(b => b.onclick = () => aoEscolher(b.dataset.cor));
+    }
+
+    function renderSwatchesEdicao() {
+      renderSwatches("swatchesBg", CORES_FUNDO, corFundoEdit, cor => { corFundoEdit = cor; renderSwatchesEdicao(); });
+      renderSwatches("swatchesFg", CORES_FONTE, corFonteEdit, cor => { corFonteEdit = cor; renderSwatchesEdicao(); });
+    }
+
     function escapeHtml(str) {
       const div = document.createElement("div");
       div.textContent = str || "";
@@ -215,8 +250,8 @@
 
       container.innerHTML = filtradas.map(a => {
         const idx = aulas.findIndex(x => x.id_aula === a.id_aula);
-        return `<div class="aula-item ${a.id_aula === aulaAtualId ? "active" : ""}" onclick="selecionarAula(${a.id_aula})">
-          <span class="num">${idx + 1}.</span>
+        return `<div class="aula-item ${a.id_aula === aulaAtualId ? "active" : ""}" style="${estiloAulaCss(a)}" onclick="selecionarAula(${a.id_aula})">
+          <span class="num" style="color:inherit; opacity:.7;">${idx + 1}.</span>
           <span>${a.tipo_midia === "audio" ? "🎧 " : ""}${escapeHtml(a.titulo)}</span>
         </div>`;
       }).join("");
@@ -235,7 +270,7 @@
       document.getElementById("descAula").textContent = aula.descricao || "";
 
       const idx = aulas.findIndex(a => a.id_aula === id);
-      document.getElementById("posicaoAula").textContent = `Aula ${idx + 1} de ${aulas.length}`;
+      atualizarPosicaoAula();
 
       document.getElementById("btnAnterior").disabled = idx <= 0;
       document.getElementById("btnProxima").disabled = idx >= aulas.length - 1;
@@ -244,11 +279,22 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
+    function atualizarPosicaoAula() {
+      const aula = aulas.find(a => a.id_aula === aulaAtualId);
+      const idx = aulas.findIndex(a => a.id_aula === aulaAtualId);
+      document.getElementById("posicaoAula").textContent =
+        `Aula ${idx + 1} de ${aulas.length} · Duração ${segundosParaHHMMSS(aula.duracao_segundos)}`;
+    }
+
     function editarAula() {
       const aula = aulas.find(a => a.id_aula === aulaAtualId);
       if (!aula) return;
       document.getElementById("editTituloInput").value = aula.titulo;
       document.getElementById("editDescInput").value = aula.descricao || "";
+      document.getElementById("editDuracaoInput").value = segundosParaHHMMSS(aula.duracao_segundos);
+      corFundoEdit = corValida((aula.estilo || {}).bg);
+      corFonteEdit = corValida((aula.estilo || {}).fg);
+      renderSwatchesEdicao();
       document.getElementById("tituloAula").style.display = "none";
       document.getElementById("descAula").style.display = "none";
       document.getElementById("btnEditarAula").style.display = "none";
@@ -265,6 +311,10 @@
     async function salvarEdicaoAula() {
       const titulo = document.getElementById("editTituloInput").value.trim();
       const descricao = document.getElementById("editDescInput").value.trim();
+      const duracao_segundos = parseDuracaoParaSegundos(document.getElementById("editDuracaoInput").value);
+      const estilo = {};
+      if (corFundoEdit) estilo.bg = corFundoEdit;
+      if (corFonteEdit) estilo.fg = corFonteEdit;
       if (!titulo) {
         alert("O título não pode ficar vazio.");
         return;
@@ -272,7 +322,7 @@
 
       const { error } = await supabaseClient
         .from("aulas")
-        .update({ titulo, descricao: descricao || null })
+        .update({ titulo, descricao: descricao || null, duracao_segundos, estilo })
         .eq("id_aula", aulaAtualId);
 
       if (error) {
@@ -283,9 +333,12 @@
       const aula = aulas.find(a => a.id_aula === aulaAtualId);
       aula.titulo = titulo;
       aula.descricao = descricao;
+      aula.duracao_segundos = duracao_segundos;
+      aula.estilo = estilo;
 
       document.getElementById("tituloAula").textContent = titulo;
       document.getElementById("descAula").textContent = descricao;
+      atualizarPosicaoAula();
       renderListaAulas();
       cancelarEdicaoAula();
     }

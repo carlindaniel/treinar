@@ -30,6 +30,15 @@ function segundosParaMMSS(segundos) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Formato fixo hh:mm:ss (ex: 00:01:00) usado nos campos de edição.
+function segundosParaHHMMSS(segundos) {
+  segundos = Math.max(0, Math.round(Number(segundos) || 0));
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
+  const s = segundos % 60;
+  return [h, m, s].map(n => String(n).padStart(2, "0")).join(":");
+}
+
 function formatarCargaHoraria(segundos) {
   segundos = Math.max(0, Math.round(Number(segundos) || 0));
   const h = Math.floor(segundos / 3600);

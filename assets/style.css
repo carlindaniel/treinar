@@ -284,3 +284,9 @@ table.data-table tr.dragging { opacity: 0.4; }
 .divider { height: 1px; background: var(--border); margin: 24px 0; }
 
 .loading { color: var(--text-dim); font-size: 0.85rem; padding: 20px 0; }
+
+/* ---- seletor de cores da aula (curso.html) ---- */
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.swatch { width: 28px; height: 28px; padding: 0; border-radius: 6px; border: 2px solid var(--border, #444); cursor: pointer; }
+.swatch.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--primary, #6c5ce7); }
+.swatch-padrao { background: repeating-linear-gradient(45deg, #555 0 4px, #333 4px 8px); }
