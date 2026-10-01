@@ -22,7 +22,50 @@
       <h2>Cursos disponíveis</h2>
     </div>
 
-    <input type="text" class="search-box" id="busca" placeholder="Pesquisar curso por nome ou categoria..." oninput="renderCursos()">
+    <div class="filtros">
+      <div>
+        <label for="busca">Buscar</label>
+        <input type="text" id="busca" placeholder="Nome ou categoria..." oninput="renderCursos()">
+      </div>
+      <div>
+        <label for="filtroCategoria">Categoria</label>
+        <select id="filtroCategoria" onchange="renderCursos()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div>
+        <label for="filtroAulas">Nº de aulas</label>
+        <select id="filtroAulas" onchange="renderCursos()">
+          <option value="">Qualquer</option>
+          <option value="1-5">1 a 5 aulas</option>
+          <option value="6-15">6 a 15 aulas</option>
+          <option value="16+">16 ou mais</option>
+        </select>
+      </div>
+      <div>
+        <label for="filtroDuracao">Carga horária</label>
+        <select id="filtroDuracao" onchange="renderCursos()">
+          <option value="">Qualquer</option>
+          <option value="0-3600">Até 1h</option>
+          <option value="3600-18000">1h a 5h</option>
+          <option value="18000+">Mais de 5h</option>
+        </select>
+      </div>
+      <div>
+        <label for="ordenar">Ordenar por</label>
+        <select id="ordenar" onchange="renderCursos()">
+          <option value="nome-asc">Nome (A–Z)</option>
+          <option value="nome-desc">Nome (Z–A)</option>
+          <option value="aulas-desc">Mais aulas</option>
+          <option value="aulas-asc">Menos aulas</option>
+          <option value="duracao-desc">Maior carga horária</option>
+          <option value="duracao-asc">Menor carga horária</option>
+          <option value="categoria-asc">Categoria (A–Z)</option>
+        </select>
+      </div>
+      <button class="btn-outline btn-sm" onclick="limparFiltros()">Limpar</button>
+    </div>
+    <p class="hint" id="contagem"></p>
 
     <div id="listaCursos" class="loading">Carregando cursos...</div>
   </div>
@@ -45,15 +88,55 @@
         return;
       }
       cursos = data || [];
+      const sel = document.getElementById("filtroCategoria");
+      const cats = [...new Set(cursos.map(c => c.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+      sel.innerHTML = `<option value="">Todas</option>` +
+        cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("") +
+        `<option value="__sem">Sem categoria</option>`;
       renderCursos();
+    }
+
+    function limparFiltros() {
+      ["busca", "filtroCategoria", "filtroAulas", "filtroDuracao"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("ordenar").value = "nome-asc";
+      renderCursos();
+    }
+
+    function dentroFaixa(valor, faixa) {
+      if (!faixa) return true;
+      if (faixa.endsWith("+")) return valor >= Number(faixa.slice(0, -1));
+      const [min, max] = faixa.split("-").map(Number);
+      return valor >= min && valor <= max;
     }
 
     function renderCursos() {
       const termo = document.getElementById("busca").value.trim().toLowerCase();
+      const cat = document.getElementById("filtroCategoria").value;
+      const faixaAulas = document.getElementById("filtroAulas").value;
+      const faixaDuracao = document.getElementById("filtroDuracao").value;
+      const [campo, dir] = document.getElementById("ordenar").value.split("-");
+
       const filtrados = cursos.filter(c =>
-        c.nome.toLowerCase().includes(termo) ||
-        (c.categoria || "").toLowerCase().includes(termo)
+        (c.nome.toLowerCase().includes(termo) || (c.categoria || "").toLowerCase().includes(termo)) &&
+        (!cat || (cat === "__sem" ? !c.categoria : c.categoria === cat)) &&
+        dentroFaixa(Number(c.total_aulas) || 0, faixaAulas) &&
+        dentroFaixa(Number(c.duracao_total_segundos) || 0, faixaDuracao)
       );
+
+      const chave = {
+        nome: c => c.nome,
+        categoria: c => c.categoria || "",
+        aulas: c => Number(c.total_aulas) || 0,
+        duracao: c => Number(c.duracao_total_segundos) || 0
+      }[campo];
+      filtrados.sort((a, b) => {
+        const x = chave(a), y = chave(b);
+        const r = typeof x === "string" ? x.localeCompare(y, "pt-BR") : x - y;
+        return dir === "desc" ? -r : r;
+      });
+
+      document.getElementById("contagem").textContent =
+        `${filtrados.length} de ${cursos.length} curso${cursos.length == 1 ? "" : "s"}`;
 
       const container = document.getElementById("listaCursos");
 

@@ -157,6 +157,10 @@ button {
 
 .search-box { max-width: 340px; margin-bottom: 20px; }
 
+.filtros { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 8px; }
+.filtros > div { flex: 1 1 150px; min-width: 140px; }
+.filtros label { display: block; font-size: 0.78rem; margin-bottom: 4px; }
+
 .grid-cursos {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

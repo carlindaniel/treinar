@@ -34,9 +34,14 @@
           </div>
           <div>
             <label for="novoCursoCategoria">Categoria</label>
-            <input type="text" id="novoCursoCategoria" placeholder="Ex: Comercial">
+            <select id="novoCursoCategoria" onchange="mostrarDescricaoCategoria()">
+              <option value="">Selecione uma categoria...</option>
+              <option value="Relacionamentos">Relacionamentos</option>
+              <option value="Finanças">Finanças</option>
+            </select>
           </div>
         </div>
+        <p class="hint" id="descCategoria"></p>
         <button class="btn" style="margin-top:14px;" onclick="criarCurso()">Adicionar curso</button>
         <div class="error-msg" id="msgErroCurso"></div>
       </div>
@@ -152,6 +157,28 @@
       return div.innerHTML;
     }
 
+    const CATEGORIAS = {
+      "Relacionamentos": "Área dedicada ao desenvolvimento das habilidades e fundamentos necessários para construir melhores relações com outras pessoas. Abrange temas como comunicação, atração, conexão, intimidade, autoconhecimento, autoestima, confiança, inteligência social e desenvolvimento pessoal aplicado aos relacionamentos.",
+      "Finanças": "Área dedicada ao desenvolvimento da capacidade de gerar, administrar e multiplicar recursos. Abrange temas como geração de renda, carreira, vendas, negócios, investimentos, gestão financeira, tomada de decisão e desenvolvimento das competências pessoais necessárias para construir maior autonomia financeira."
+    };
+
+    function mostrarDescricaoCategoria() {
+      const cat = document.getElementById("novoCursoCategoria").value;
+      document.getElementById("descCategoria").innerHTML = cat
+        ? `<strong>${escapeHtml(cat)}:</strong> ${escapeHtml(CATEGORIAS[cat])}`
+        : Object.entries(CATEGORIAS).map(([k, v]) => `<strong>${escapeHtml(k)}:</strong> ${escapeHtml(v)}`).join("<br><br>");
+    }
+
+    function selectCategoriaHtml(atual) {
+      const opcoes = Object.keys(CATEGORIAS);
+      // preserva categorias antigas (texto livre) para não perder dados
+      if (atual && !opcoes.includes(atual)) opcoes.push(atual);
+      return `<select data-field="categoria">
+        <option value=""${atual ? "" : " selected"}>Sem categoria</option>
+        ${opcoes.map(o => `<option value="${escapeHtml(o)}"${o === atual ? " selected" : ""}>${escapeHtml(o)}</option>`).join("")}
+      </select>`;
+    }
+
     function mostrarAba(aba) {
       document.getElementById("abaCursos").style.display = aba === "cursos" ? "block" : "none";
       document.getElementById("abaAulas").style.display = aba === "aulas" ? "block" : "none";
@@ -184,7 +211,7 @@
       tbody.innerHTML = cursos.map(c => `
         <tr data-id="${c.id_curso}">
           <td><input type="text" value="${escapeHtml(c.nome)}" data-field="nome"></td>
-          <td><input type="text" value="${escapeHtml(c.categoria || "")}" data-field="categoria"></td>
+          <td>${selectCategoriaHtml(c.categoria)}</td>
           <td>${c.total_aulas}</td>
           <td>${formatarCargaHoraria(c.duracao_total_segundos)}</td>
           <td class="col-actions">
@@ -205,12 +232,16 @@
 
     async function criarCurso() {
       const nome = document.getElementById("novoCursoNome").value.trim();
-      const categoria = document.getElementById("novoCursoCategoria").value.trim();
+      const categoria = document.getElementById("novoCursoCategoria").value;
       const msg = document.getElementById("msgErroCurso");
       msg.textContent = "";
 
       if (!nome) {
         msg.textContent = "Informe o nome do curso.";
+        return;
+      }
+      if (!categoria) {
+        msg.textContent = "Selecione a categoria do curso.";
         return;
       }
 
@@ -221,13 +252,14 @@
       }
       document.getElementById("novoCursoNome").value = "";
       document.getElementById("novoCursoCategoria").value = "";
+      mostrarDescricaoCategoria();
       carregarCursos();
     }
 
     async function salvarCurso(id, btn) {
       const row = btn.closest("tr");
       const nome = row.querySelector('[data-field="nome"]').value.trim();
-      const categoria = row.querySelector('[data-field="categoria"]').value.trim();
+      const categoria = row.querySelector('[data-field="categoria"]').value;
 
       const { error } = await supabaseClient.from("cursos")
         .update({ nome, categoria: categoria || null })
@@ -499,6 +531,7 @@
     (async () => {
       await requireAuth();
       initTopbarUser("userEmail");
+      mostrarDescricaoCategoria();
       carregarCursos();
     })();
   </script>
