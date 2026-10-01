@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exercícios - Plataforma de Treinamento</title>
+<link rel="stylesheet" href="assets/style.css?v=4">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Plataforma de Treinamento</div>
+    <nav>
+      <a href="dashboard.html">Cursos</a>
+      <a href="exercicios.html">Exercícios</a>
+      <a href="admin.html">Administração</a>
+      <a href="admin_exercicios.html">Admin Exercícios</a>
+      <span id="userEmail" class="hint"></span>
+      <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="section-title">
+      <h2>Listas de exercícios</h2>
+    </div>
+
+    <input type="text" class="search-box" id="busca" placeholder="Pesquisar lista por nome ou categoria..." oninput="renderListas()">
+
+    <div id="listaAreas" class="loading">Carregando listas...</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js?v=2"></script>
+  <script src="assets/auth-guard.js?v=2"></script>
+  <script>
+    let listas = [];
+
+    async function carregarListas() {
+      const { data, error } = await supabaseClient
+        .from("listas_area_com_contagem")
+        .select("*");
+
+      const container = document.getElementById("listaAreas");
+      if (error) {
+        container.innerHTML = `<div class="error-msg">Erro ao carregar listas: ${escapeHtml(error.message)}</div>`;
+        return;
+      }
+      listas = data || [];
+      renderListas();
+    }
+
+    function renderListas() {
+      const termo = document.getElementById("busca").value.trim().toLowerCase();
+      const filtradas = listas.filter(l =>
+        l.nome.toLowerCase().includes(termo) ||
+        (l.categoria || "").toLowerCase().includes(termo)
+      );
+
+      const container = document.getElementById("listaAreas");
+
+      if (filtradas.length === 0) {
+        container.innerHTML = `<div class="empty-state">Nenhuma lista encontrada.</div>`;
+        return;
+      }
+
+      container.innerHTML = `<div class="grid-cursos">
+        ${filtradas.map(l => `
+          <a class="curso-card" href="lista_exercicios.html?id=${l.id_area}">
+            <span class="badge">${l.categoria ? escapeHtml(l.categoria) : "Sem categoria"}</span>
+            <h3>${escapeHtml(l.nome)}</h3>
+            <span class="meta">${l.total_exercicios} exercício${l.total_exercicios == 1 ? "" : "s"}</span>
+          </a>
+        `).join("")}
+      </div>`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    (async () => {
+      await requireAuth();
+      initTopbarUser("userEmail");
+      carregarListas();
+    })();
+  </script>
+</body>
+</html>

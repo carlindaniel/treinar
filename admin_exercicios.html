@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administração de Exercícios - Plataforma de Treinamento</title>
+<link rel="stylesheet" href="assets/style.css?v=4">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><a href="exercicios.html" style="color:inherit;text-decoration:none;">&larr; Plataforma de Treinamento</a></div>
+    <nav>
+      <a href="dashboard.html">Cursos</a>
+      <a href="exercicios.html">Exercícios</a>
+      <a href="admin.html">Administração</a>
+      <a href="admin_exercicios.html">Admin Exercícios</a>
+      <span id="userEmail" class="hint"></span>
+      <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="admin-tabs">
+      <button class="tab-btn active" id="tabBtnListas" onclick="mostrarAba('listas')">Listas</button>
+      <button class="tab-btn" id="tabBtnExercicios" onclick="mostrarAba('exercicios')">Exercícios</button>
+    </div>
+
+    <!-- ================= ABA LISTAS ================= -->
+    <div id="abaListas">
+      <div class="card">
+        <div class="section-title"><h2>Nova lista</h2></div>
+        <div class="form-row">
+          <div>
+            <label for="novaListaNome">Nome</label>
+            <input type="text" id="novaListaNome" placeholder="Ex: Exercícios de Vendas">
+          </div>
+          <div>
+            <label for="novaListaCategoria">Categoria</label>
+            <input type="text" id="novaListaCategoria" placeholder="Ex: Comercial">
+          </div>
+        </div>
+        <button class="btn" style="margin-top:14px;" onclick="criarLista()">Adicionar lista</button>
+        <div class="error-msg" id="msgErroLista"></div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <div class="section-title"><h2>Listas cadastradas</h2></div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Categoria</th>
+              <th>Exercícios</th>
+              <th class="col-actions-cell">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaListas"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ================= ABA EXERCÍCIOS ================= -->
+    <div id="abaExercicios" style="display:none;">
+      <div class="card">
+        <div class="section-title"><h2>Selecionar lista</h2></div>
+        <select id="selectLista" onchange="onListaChange()">
+          <option value="">Selecione uma lista...</option>
+        </select>
+      </div>
+
+      <div id="blocoExercicios" style="display:none;">
+        <div class="card" style="margin-top:20px;">
+          <div class="section-title"><h2>Novo exercício</h2></div>
+          <p class="hint">O identificador (id_exercicio) é gerado automaticamente pelo banco de dados.</p>
+          <div class="form-row">
+            <div>
+              <label for="novoTitulo">Título</label>
+              <input type="text" id="novoTitulo" placeholder="Ex: Exercício 1">
+            </div>
+            <div>
+              <label for="novoOrdem">Ordem</label>
+              <input type="number" id="novoOrdem" placeholder="1">
+            </div>
+          </div>
+          <label for="novoUrl">URL do documento (Google Docs)</label>
+          <input type="text" id="novoUrl" placeholder="https://docs.google.com/document/d/.../edit?usp=sharing">
+          <label for="novoDesc">Descrição</label>
+          <textarea id="novoDesc" placeholder="Descrição do exercício (opcional)"></textarea>
+          <button class="btn" style="margin-top:14px;" onclick="criarExercicio()">Adicionar exercício</button>
+          <div class="error-msg" id="msgErroExercicio"></div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div class="section-title"><h2>Exercícios da lista</h2></div>
+          <p class="hint">Arraste pela alça <strong>⠿</strong> para reordenar os exercícios.</p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="col-drag"></th>
+                <th class="col-id">ID</th>
+                <th class="col-ordem">Ordem</th>
+                <th>Título</th>
+                <th>URL do documento</th>
+                <th>Descrição</th>
+                <th class="col-actions-cell">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaExercicios"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js?v=2"></script>
+  <script src="assets/auth-guard.js?v=2"></script>
+  <script>
+    let listas = [];
+    let exerciciosLista = [];
+    let listaSelecionadaId = "";
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str || "";
+      return div.innerHTML;
+    }
+
+    function mostrarAba(aba) {
+      document.getElementById("abaListas").style.display = aba === "listas" ? "block" : "none";
+      document.getElementById("abaExercicios").style.display = aba === "exercicios" ? "block" : "none";
+      document.getElementById("tabBtnListas").classList.toggle("active", aba === "listas");
+      document.getElementById("tabBtnExercicios").classList.toggle("active", aba === "exercicios");
+    }
+
+    // ---------------- LISTAS ----------------
+
+    async function carregarListas() {
+      const { data, error } = await supabaseClient
+        .from("listas_area_com_contagem")
+        .select("*");
+
+      if (error) {
+        document.getElementById("tabelaListas").innerHTML = `<tr><td colspan="4" class="error-msg">${escapeHtml(error.message)}</td></tr>`;
+        return;
+      }
+      listas = data || [];
+      renderTabelaListas();
+      renderSelectListas();
+    }
+
+    function renderTabelaListas() {
+      const tbody = document.getElementById("tabelaListas");
+      if (listas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4">Nenhuma lista cadastrada.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = listas.map(l => `
+        <tr data-id="${l.id_area}">
+          <td><input type="text" value="${escapeHtml(l.nome)}" data-field="nome"></td>
+          <td><input type="text" value="${escapeHtml(l.categoria || "")}" data-field="categoria"></td>
+          <td>${l.total_exercicios}</td>
+          <td class="col-actions">
+            <button class="btn-outline btn-sm" onclick="salvarLista(${l.id_area}, this)">Salvar</button>
+            <button class="btn-danger" onclick="excluirLista(${l.id_area})">Excluir</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function renderSelectListas() {
+      const select = document.getElementById("selectLista");
+      const atual = select.value;
+      select.innerHTML = `<option value="">Selecione uma lista...</option>` +
+        listas.map(l => `<option value="${l.id_area}">${escapeHtml(l.nome)}</option>`).join("");
+      if (atual) select.value = atual;
+    }
+
+    async function criarLista() {
+      const nome = document.getElementById("novaListaNome").value.trim();
+      const categoria = document.getElementById("novaListaCategoria").value.trim();
+      const msg = document.getElementById("msgErroLista");
+      msg.textContent = "";
+
+      if (!nome) {
+        msg.textContent = "Informe o nome da lista.";
+        return;
+      }
+
+      const { error } = await supabaseClient.from("listas_area").insert({ nome, categoria: categoria || null });
+      if (error) {
+        msg.textContent = error.message;
+        return;
+      }
+      document.getElementById("novaListaNome").value = "";
+      document.getElementById("novaListaCategoria").value = "";
+      carregarListas();
+    }
+
+    async function salvarLista(id, btn) {
+      const row = btn.closest("tr");
+      const nome = row.querySelector('[data-field="nome"]').value.trim();
+      const categoria = row.querySelector('[data-field="categoria"]').value.trim();
+
+      const { error } = await supabaseClient.from("listas_area")
+        .update({ nome, categoria: categoria || null })
+        .eq("id_area", id);
+
+      if (error) {
+        alert("Erro ao salvar: " + error.message);
+        return;
+      }
+      carregarListas();
+    }
+
+    async function excluirLista(id) {
+      if (!confirm("Excluir esta lista e todos os seus exercícios?")) return;
+      const { error } = await supabaseClient.from("listas_area").delete().eq("id_area", id);
+      if (error) {
+        alert("Erro ao excluir: " + error.message);
+        return;
+      }
+      carregarListas();
+    }
+
+    // ---------------- EXERCÍCIOS ----------------
+
+    function onListaChange() {
+      listaSelecionadaId = document.getElementById("selectLista").value;
+      document.getElementById("blocoExercicios").style.display = listaSelecionadaId ? "block" : "none";
+      if (listaSelecionadaId) carregarExercicios();
+    }
+
+    async function carregarExercicios() {
+      const { data, error } = await supabaseClient
+        .from("exercicios")
+        .select("*")
+        .eq("id_area", listaSelecionadaId)
+        .order("ordem", { ascending: true });
+
+      if (error) {
+        document.getElementById("tabelaExercicios").innerHTML = `<tr><td colspan="7" class="error-msg">${escapeHtml(error.message)}</td></tr>`;
+        return;
+      }
+      exerciciosLista = data || [];
+      renderTabelaExercicios();
+    }
+
+    function renderTabelaExercicios() {
+      const tbody = document.getElementById("tabelaExercicios");
+      if (exerciciosLista.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7">Nenhum exercício cadastrado para esta lista.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = exerciciosLista.map(e => `
+        <tr data-id="${e.id_exercicio}"
+            class="${e.id_exercicio === arrastandoId ? "dragging" : ""}"
+            ondragover="arrastarSobre(event, ${e.id_exercicio})"
+            ondrop="event.preventDefault()">
+          <td class="col-drag" draggable="true" title="Arrastar para reordenar"
+              ondragstart="iniciarArrasto(event, ${e.id_exercicio})"
+              ondragend="finalizarArrasto()">⠿</td>
+          <td class="col-id">#${e.id_exercicio}</td>
+          <td class="col-ordem">${e.ordem}</td>
+          <td><input type="text" value="${escapeHtml(e.titulo)}" data-field="titulo"></td>
+          <td><input type="text" value="${escapeHtml(e.url_exercicio)}" data-field="url_exercicio"></td>
+          <td><input type="text" value="${escapeHtml(e.descricao || "")}" data-field="descricao"></td>
+          <td class="col-actions">
+            <button class="btn-outline btn-sm" onclick="salvarExercicio(${e.id_exercicio}, this)">Salvar</button>
+            <button class="btn-danger" onclick="excluirExercicio(${e.id_exercicio})">Excluir</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    let arrastandoId = null;
+
+    function iniciarArrasto(e, id) {
+      arrastandoId = id;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(id));
+    }
+
+    function arrastarSobre(e, sobreId) {
+      e.preventDefault();
+      if (arrastandoId === null || arrastandoId === sobreId) return;
+
+      const idxArrastando = exerciciosLista.findIndex(x => x.id_exercicio === arrastandoId);
+      const idxAlvo = exerciciosLista.findIndex(x => x.id_exercicio === sobreId);
+      if (idxArrastando === -1 || idxAlvo === -1) return;
+
+      const [item] = exerciciosLista.splice(idxArrastando, 1);
+      exerciciosLista.splice(idxAlvo, 0, item);
+      renderTabelaExercicios();
+    }
+
+    async function finalizarArrasto() {
+      if (arrastandoId === null) return;
+      arrastandoId = null;
+
+      exerciciosLista.forEach((x, i) => { x.ordem = i + 1; });
+      renderTabelaExercicios();
+
+      const resultados = await Promise.all(
+        exerciciosLista.map(x => supabaseClient.from("exercicios").update({ ordem: x.ordem }).eq("id_exercicio", x.id_exercicio))
+      );
+      const comErro = resultados.find(r => r.error);
+      if (comErro) {
+        alert("Erro ao salvar nova ordem: " + comErro.error.message);
+        carregarExercicios();
+      }
+    }
+
+    async function criarExercicio() {
+      const titulo = document.getElementById("novoTitulo").value.trim();
+      const url_exercicio = document.getElementById("novoUrl").value.trim();
+      const descricao = document.getElementById("novoDesc").value.trim();
+      const ordemInput = document.getElementById("novoOrdem").value;
+      const msg = document.getElementById("msgErroExercicio");
+      msg.textContent = "";
+
+      if (!titulo || !url_exercicio) {
+        msg.textContent = "Preencha ao menos o título e a URL do documento.";
+        return;
+      }
+
+      const ordem = ordemInput ? Number(ordemInput) : (exerciciosLista.length > 0 ? Math.max(...exerciciosLista.map(x => x.ordem)) + 1 : 1);
+
+      // id_exercicio não é enviado: o banco (identity) gera automaticamente.
+      const { error } = await supabaseClient.from("exercicios").insert({
+        id_area: Number(listaSelecionadaId),
+        titulo,
+        url_exercicio,
+        descricao: descricao || null,
+        ordem
+      });
+
+      if (error) {
+        msg.textContent = error.message;
+        return;
+      }
+
+      document.getElementById("novoTitulo").value = "";
+      document.getElementById("novoUrl").value = "";
+      document.getElementById("novoDesc").value = "";
+      document.getElementById("novoOrdem").value = "";
+      carregarExercicios();
+      carregarListas();
+    }
+
+    async function salvarExercicio(id, btn) {
+      const row = btn.closest("tr");
+      const titulo = row.querySelector('[data-field="titulo"]').value.trim();
+      const url_exercicio = row.querySelector('[data-field="url_exercicio"]').value.trim();
+      const descricao = row.querySelector('[data-field="descricao"]').value.trim();
+
+      const { error } = await supabaseClient.from("exercicios")
+        .update({ titulo, url_exercicio, descricao: descricao || null })
+        .eq("id_exercicio", id);
+
+      if (error) {
+        alert("Erro ao salvar: " + error.message);
+        return;
+      }
+      carregarExercicios();
+      carregarListas();
+    }
+
+    async function excluirExercicio(id) {
+      if (!confirm("Excluir este exercício?")) return;
+      const { error } = await supabaseClient.from("exercicios").delete().eq("id_exercicio", id);
+      if (error) {
+        alert("Erro ao excluir: " + error.message);
+        return;
+      }
+      carregarExercicios();
+      carregarListas();
+    }
+
+    (async () => {
+      await requireAuth();
+      initTopbarUser("userEmail");
+      carregarListas();
+    })();
+  </script>
+</body>
+</html>
