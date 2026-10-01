@@ -10,9 +10,7 @@
   <div class="topbar">
     <div class="brand"><a href="exercicios.html" style="color:inherit;text-decoration:none;">&larr; Plataforma de Treinamento</a></div>
     <nav>
-      <a href="dashboard.html">Cursos</a>
       <a href="exercicios.html">Exercícios</a>
-      <a href="admin.html">Administração</a>
       <a href="admin_exercicios.html">Admin Exercícios</a>
       <span id="userEmail" class="hint"></span>
       <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
@@ -36,9 +34,16 @@
           </div>
           <div>
             <label for="novaListaCategoria">Categoria</label>
-            <input type="text" id="novaListaCategoria" placeholder="Ex: Comercial">
+            <select id="novaListaCategoria" onchange="mostrarDescricaoCategoria()">
+              <option value="">Selecione uma categoria...</option>
+              <option value="Físico">Físico</option>
+              <option value="Mental">Mental</option>
+              <option value="Habilidade">Habilidade</option>
+              <option value="Social">Social</option>
+            </select>
           </div>
         </div>
+        <p class="hint" id="descCategoria"></p>
         <button class="btn" style="margin-top:14px;" onclick="criarLista()">Adicionar lista</button>
         <div class="error-msg" id="msgErroLista"></div>
       </div>
@@ -126,6 +131,30 @@
       return div.innerHTML;
     }
 
+    const CATEGORIAS = {
+      "Físico": "Tudo relacionado ao desenvolvimento corporal.",
+      "Mental": "Tudo relacionado a conhecimento, raciocínio, memória, atenção e percepção.",
+      "Habilidade": "Tudo relacionado a aprender a fazer algo: programação, desenho, luta, instrumento, técnica profissional etc.",
+      "Social": "Tudo relacionado a comunicação, interação, comportamento e relacionamento com outras pessoas."
+    };
+
+    function mostrarDescricaoCategoria() {
+      const cat = document.getElementById("novaListaCategoria").value;
+      document.getElementById("descCategoria").innerHTML = cat
+        ? `<strong>${escapeHtml(cat)}:</strong> ${escapeHtml(CATEGORIAS[cat])}`
+        : Object.entries(CATEGORIAS).map(([k, v]) => `<strong>${escapeHtml(k)}:</strong> ${escapeHtml(v)}`).join("<br>");
+    }
+
+    function selectCategoriaHtml(atual) {
+      const opcoes = Object.keys(CATEGORIAS);
+      // preserva categorias antigas (texto livre) para não perder dados
+      if (atual && !opcoes.includes(atual)) opcoes.push(atual);
+      return `<select data-field="categoria">
+        <option value=""${atual ? "" : " selected"}>Sem categoria</option>
+        ${opcoes.map(o => `<option value="${escapeHtml(o)}"${o === atual ? " selected" : ""}>${escapeHtml(o)}</option>`).join("")}
+      </select>`;
+    }
+
     function mostrarAba(aba) {
       document.getElementById("abaListas").style.display = aba === "listas" ? "block" : "none";
       document.getElementById("abaExercicios").style.display = aba === "exercicios" ? "block" : "none";
@@ -158,7 +187,7 @@
       tbody.innerHTML = listas.map(l => `
         <tr data-id="${l.id_area}">
           <td><input type="text" value="${escapeHtml(l.nome)}" data-field="nome"></td>
-          <td><input type="text" value="${escapeHtml(l.categoria || "")}" data-field="categoria"></td>
+          <td>${selectCategoriaHtml(l.categoria)}</td>
           <td>${l.total_exercicios}</td>
           <td class="col-actions">
             <button class="btn-outline btn-sm" onclick="salvarLista(${l.id_area}, this)">Salvar</button>
@@ -178,12 +207,16 @@
 
     async function criarLista() {
       const nome = document.getElementById("novaListaNome").value.trim();
-      const categoria = document.getElementById("novaListaCategoria").value.trim();
+      const categoria = document.getElementById("novaListaCategoria").value;
       const msg = document.getElementById("msgErroLista");
       msg.textContent = "";
 
       if (!nome) {
         msg.textContent = "Informe o nome da lista.";
+        return;
+      }
+      if (!categoria) {
+        msg.textContent = "Selecione a categoria da lista.";
         return;
       }
 
@@ -194,13 +227,14 @@
       }
       document.getElementById("novaListaNome").value = "";
       document.getElementById("novaListaCategoria").value = "";
+      mostrarDescricaoCategoria();
       carregarListas();
     }
 
     async function salvarLista(id, btn) {
       const row = btn.closest("tr");
       const nome = row.querySelector('[data-field="nome"]').value.trim();
-      const categoria = row.querySelector('[data-field="categoria"]').value.trim();
+      const categoria = row.querySelector('[data-field="categoria"]').value;
 
       const { error } = await supabaseClient.from("listas_area")
         .update({ nome, categoria: categoria || null })
@@ -380,6 +414,7 @@
     (async () => {
       await requireAuth();
       initTopbarUser("userEmail");
+      mostrarDescricaoCategoria();
       carregarListas();
     })();
   </script>

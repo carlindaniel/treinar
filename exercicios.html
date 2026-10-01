@@ -10,9 +10,7 @@
   <div class="topbar">
     <div class="brand">Plataforma de Treinamento</div>
     <nav>
-      <a href="dashboard.html">Cursos</a>
       <a href="exercicios.html">Exercícios</a>
-      <a href="admin.html">Administração</a>
       <a href="admin_exercicios.html">Admin Exercícios</a>
       <span id="userEmail" class="hint"></span>
       <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
@@ -24,7 +22,39 @@
       <h2>Listas de exercícios</h2>
     </div>
 
-    <input type="text" class="search-box" id="busca" placeholder="Pesquisar lista por nome ou categoria..." oninput="renderListas()">
+    <div class="filtros">
+      <div>
+        <label for="busca">Buscar</label>
+        <input type="text" id="busca" placeholder="Nome ou categoria..." oninput="renderListas()">
+      </div>
+      <div>
+        <label for="filtroCategoria">Categoria</label>
+        <select id="filtroCategoria" onchange="renderListas()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div>
+        <label for="filtroQtd">Nº de exercícios</label>
+        <select id="filtroQtd" onchange="renderListas()">
+          <option value="">Qualquer</option>
+          <option value="0-5">Até 5</option>
+          <option value="6-15">6 a 15</option>
+          <option value="16+">16 ou mais</option>
+        </select>
+      </div>
+      <div>
+        <label for="ordenar">Ordenar por</label>
+        <select id="ordenar" onchange="renderListas()">
+          <option value="nome-asc">Nome (A–Z)</option>
+          <option value="nome-desc">Nome (Z–A)</option>
+          <option value="qtd-desc">Mais exercícios</option>
+          <option value="qtd-asc">Menos exercícios</option>
+          <option value="categoria-asc">Categoria (A–Z)</option>
+        </select>
+      </div>
+      <button class="btn-outline btn-sm" onclick="limparFiltros()">Limpar</button>
+    </div>
+    <p class="hint" id="contagem"></p>
 
     <div id="listaAreas" class="loading">Carregando listas...</div>
   </div>
@@ -46,15 +76,52 @@
         return;
       }
       listas = data || [];
+      const sel = document.getElementById("filtroCategoria");
+      const cats = [...new Set(listas.map(l => l.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+      sel.innerHTML = `<option value="">Todas</option>` +
+        cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("") +
+        `<option value="__sem">Sem categoria</option>`;
       renderListas();
+    }
+
+    function limparFiltros() {
+      ["busca", "filtroCategoria", "filtroQtd"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("ordenar").value = "nome-asc";
+      renderListas();
+    }
+
+    function dentroFaixa(valor, faixa) {
+      if (!faixa) return true;
+      if (faixa.endsWith("+")) return valor >= Number(faixa.slice(0, -1));
+      const [min, max] = faixa.split("-").map(Number);
+      return valor >= min && valor <= max;
     }
 
     function renderListas() {
       const termo = document.getElementById("busca").value.trim().toLowerCase();
+      const cat = document.getElementById("filtroCategoria").value;
+      const faixa = document.getElementById("filtroQtd").value;
+      const [campo, dir] = document.getElementById("ordenar").value.split("-");
+
       const filtradas = listas.filter(l =>
-        l.nome.toLowerCase().includes(termo) ||
-        (l.categoria || "").toLowerCase().includes(termo)
+        (l.nome.toLowerCase().includes(termo) || (l.categoria || "").toLowerCase().includes(termo)) &&
+        (!cat || (cat === "__sem" ? !l.categoria : l.categoria === cat)) &&
+        dentroFaixa(Number(l.total_exercicios) || 0, faixa)
       );
+
+      const chave = {
+        nome: l => l.nome,
+        categoria: l => l.categoria || "",
+        qtd: l => Number(l.total_exercicios) || 0
+      }[campo];
+      filtradas.sort((a, b) => {
+        const x = chave(a), y = chave(b);
+        const r = typeof x === "string" ? x.localeCompare(y, "pt-BR") : x - y;
+        return dir === "desc" ? -r : r;
+      });
+
+      document.getElementById("contagem").textContent =
+        `${filtradas.length} de ${listas.length} lista${listas.length == 1 ? "" : "s"}`;
 
       const container = document.getElementById("listaAreas");
 

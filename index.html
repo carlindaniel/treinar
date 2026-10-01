@@ -22,6 +22,21 @@
         <button type="submit" class="btn btn-block" id="btnSubmit">Entrar</button>
         <div class="error-msg" id="msgErro"></div>
       </form>
+
+      <div id="menuOpcoes" style="display:none;">
+        <p class="sub">O que você quer fazer?</p>
+        <div class="grid-cursos">
+          <a class="curso-card" href="dashboard.html">
+            <h3>Estudo</h3>
+            <span class="meta">Cursos e aulas</span>
+          </a>
+          <a class="curso-card" href="exercicios.html">
+            <h3>Exercícios</h3>
+            <span class="meta">Listas de exercícios</span>
+          </a>
+        </div>
+        <button type="button" class="btn-outline btn-sm" style="margin-top:16px;" onclick="sair()">Sair</button>
+      </div>
     </div>
   </div>
 
@@ -40,7 +55,7 @@
       try {
         const { error } = await supabaseClient.auth.signInWithPassword({ email, password: senha });
         if (error) throw error;
-        window.location.href = "dashboard.html";
+        mostrarOpcoes();
       } catch (err) {
         msgErro.textContent = err.message || "Erro ao autenticar.";
       } finally {
@@ -49,9 +64,20 @@
       return false;
     }
 
+    function mostrarOpcoes() {
+      document.getElementById("formAuth").style.display = "none";
+      document.querySelector(".auth-card .sub").style.display = "none";
+      document.getElementById("menuOpcoes").style.display = "block";
+    }
+
+    async function sair() {
+      await supabaseClient.auth.signOut();
+      window.location.reload();
+    }
+
     (async () => {
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) window.location.href = "dashboard.html";
+      if (session) mostrarOpcoes();
     })();
   </script>
 </body>
