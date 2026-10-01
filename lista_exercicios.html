@@ -48,6 +48,8 @@
         <div id="editForm" style="display:none; margin-top:8px;">
           <input type="text" id="editTituloInput" placeholder="Título do exercício">
           <textarea id="editDescInput" placeholder="Descrição do exercício" style="margin-top:8px;"></textarea>
+          <div class="hint" style="margin-top:8px;">Duração de execução (hh:mm:ss)</div>
+          <input type="text" id="editDuracaoInput" placeholder="00:00:00">
           <div class="hint" style="margin-top:8px;">Cor de fundo na lista</div>
           <div class="swatches" id="swatchesBg"></div>
           <div class="hint" style="margin-top:8px;">Cor da fonte na lista</div>
@@ -71,6 +73,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js?v=2"></script>
   <script src="assets/auth-guard.js?v=2"></script>
+  <script src="assets/duration-utils.js?v=3"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const idArea = params.get("id");
@@ -194,8 +197,13 @@
         return `<div class="aula-item ${e.id_exercicio === exercicioAtualId ? "active" : ""}" style="${estiloCss(e)}" onclick="selecionarExercicio(${e.id_exercicio})">
           <span class="num" style="color:inherit; opacity:.7;">${idx + 1}.</span>
           <span>${escapeHtml(e.titulo)}</span>
+          ${e.duracao_segundos > 0 ? `<span style="margin-left:auto; opacity:.7; font-size:0.8rem;">${segundosParaMMSS(e.duracao_segundos)}</span>` : ""}
         </div>`;
       }).join("");
+    }
+
+    function textoDuracao(ex) {
+      return ex.duracao_segundos > 0 ? ` · Duração: ${segundosParaMMSS(ex.duracao_segundos)}` : "";
     }
 
     function mostrarDoc(ex) {
@@ -216,7 +224,7 @@
       document.getElementById("descExercicio").textContent = ex.descricao || "";
 
       const idx = exercicios.findIndex(e => e.id_exercicio === id);
-      document.getElementById("posicaoExercicio").textContent = `Exercício ${idx + 1} de ${exercicios.length}`;
+      document.getElementById("posicaoExercicio").textContent = `Exercício ${idx + 1} de ${exercicios.length}` + textoDuracao(ex);
       document.getElementById("btnAnterior").disabled = idx <= 0;
       document.getElementById("btnProximo").disabled = idx >= exercicios.length - 1;
 
@@ -229,6 +237,7 @@
       if (!ex) return;
       document.getElementById("editTituloInput").value = ex.titulo;
       document.getElementById("editDescInput").value = ex.descricao || "";
+      document.getElementById("editDuracaoInput").value = segundosParaHHMMSS(ex.duracao_segundos);
       corFundoEdit = corValida((ex.estilo || {}).bg);
       corFonteEdit = corValida((ex.estilo || {}).fg);
       renderSwatchesEdicao();
@@ -248,6 +257,7 @@
     async function salvarEdicao() {
       const titulo = document.getElementById("editTituloInput").value.trim();
       const descricao = document.getElementById("editDescInput").value.trim();
+      const duracao_segundos = parseDuracaoParaSegundos(document.getElementById("editDuracaoInput").value.trim());
       const estilo = {};
       if (corFundoEdit) estilo.bg = corFundoEdit;
       if (corFonteEdit) estilo.fg = corFonteEdit;
@@ -258,7 +268,7 @@
 
       const { error } = await supabaseClient
         .from("exercicios")
-        .update({ titulo, descricao: descricao || null, estilo })
+        .update({ titulo, descricao: descricao || null, estilo, duracao_segundos })
         .eq("id_exercicio", exercicioAtualId);
 
       if (error) {
@@ -270,7 +280,10 @@
       ex.titulo = titulo;
       ex.descricao = descricao;
       ex.estilo = estilo;
+      ex.duracao_segundos = duracao_segundos;
 
+      const idx = exercicios.findIndex(e => e.id_exercicio === exercicioAtualId);
+      document.getElementById("posicaoExercicio").textContent = `Exercício ${idx + 1} de ${exercicios.length}` + textoDuracao(ex);
       document.getElementById("tituloExercicio").textContent = titulo;
       document.getElementById("descExercicio").textContent = descricao;
       renderListaExercicios();

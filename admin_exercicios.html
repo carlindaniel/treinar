@@ -86,6 +86,10 @@
               <label for="novoOrdem">Ordem</label>
               <input type="number" id="novoOrdem" placeholder="1">
             </div>
+            <div>
+              <label for="novoDuracao">Duração de execução (hh:mm:ss)</label>
+              <input type="text" id="novoDuracao" placeholder="Ex: 00:15:00 ou 15">
+            </div>
           </div>
           <label for="novoUrl">URL do documento (Google Docs)</label>
           <input type="text" id="novoUrl" placeholder="https://docs.google.com/document/d/.../edit?usp=sharing">
@@ -107,6 +111,7 @@
                 <th>Título</th>
                 <th>URL do documento</th>
                 <th>Descrição</th>
+                <th class="col-duracao">Duração</th>
                 <th class="col-actions-cell">Ações</th>
               </tr>
             </thead>
@@ -120,6 +125,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/supabaseClient.js?v=2"></script>
   <script src="assets/auth-guard.js?v=2"></script>
+  <script src="assets/duration-utils.js?v=3"></script>
   <script>
     let listas = [];
     let exerciciosLista = [];
@@ -273,7 +279,7 @@
         .order("ordem", { ascending: true });
 
       if (error) {
-        document.getElementById("tabelaExercicios").innerHTML = `<tr><td colspan="7" class="error-msg">${escapeHtml(error.message)}</td></tr>`;
+        document.getElementById("tabelaExercicios").innerHTML = `<tr><td colspan="8" class="error-msg">${escapeHtml(error.message)}</td></tr>`;
         return;
       }
       exerciciosLista = data || [];
@@ -283,7 +289,7 @@
     function renderTabelaExercicios() {
       const tbody = document.getElementById("tabelaExercicios");
       if (exerciciosLista.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7">Nenhum exercício cadastrado para esta lista.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8">Nenhum exercício cadastrado para esta lista.</td></tr>`;
         return;
       }
       tbody.innerHTML = exerciciosLista.map(e => `
@@ -299,6 +305,7 @@
           <td><input type="text" value="${escapeHtml(e.titulo)}" data-field="titulo"></td>
           <td><input type="text" value="${escapeHtml(e.url_exercicio)}" data-field="url_exercicio"></td>
           <td><input type="text" value="${escapeHtml(e.descricao || "")}" data-field="descricao"></td>
+          <td class="col-duracao"><input type="text" value="${segundosParaHHMMSS(e.duracao_segundos)}" data-field="duracao" placeholder="00:00:00"></td>
           <td class="col-actions">
             <button class="btn-outline btn-sm" onclick="salvarExercicio(${e.id_exercicio}, this)">Salvar</button>
             <button class="btn-danger" onclick="excluirExercicio(${e.id_exercicio})">Excluir</button>
@@ -349,6 +356,7 @@
       const titulo = document.getElementById("novoTitulo").value.trim();
       const url_exercicio = document.getElementById("novoUrl").value.trim();
       const descricao = document.getElementById("novoDesc").value.trim();
+      const duracao_segundos = parseDuracaoParaSegundos(document.getElementById("novoDuracao").value.trim());
       const ordemInput = document.getElementById("novoOrdem").value;
       const msg = document.getElementById("msgErroExercicio");
       msg.textContent = "";
@@ -366,6 +374,7 @@
         titulo,
         url_exercicio,
         descricao: descricao || null,
+        duracao_segundos,
         ordem
       });
 
@@ -378,6 +387,7 @@
       document.getElementById("novoUrl").value = "";
       document.getElementById("novoDesc").value = "";
       document.getElementById("novoOrdem").value = "";
+      document.getElementById("novoDuracao").value = "";
       carregarExercicios();
       carregarListas();
     }
@@ -387,9 +397,10 @@
       const titulo = row.querySelector('[data-field="titulo"]').value.trim();
       const url_exercicio = row.querySelector('[data-field="url_exercicio"]').value.trim();
       const descricao = row.querySelector('[data-field="descricao"]').value.trim();
+      const duracao_segundos = parseDuracaoParaSegundos(row.querySelector('[data-field="duracao"]').value.trim());
 
       const { error } = await supabaseClient.from("exercicios")
-        .update({ titulo, url_exercicio, descricao: descricao || null })
+        .update({ titulo, url_exercicio, descricao: descricao || null, duracao_segundos })
         .eq("id_exercicio", id);
 
       if (error) {
