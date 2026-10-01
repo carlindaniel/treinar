@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administração de Rotina - Plataforma de Treinamento</title>
+<link rel="stylesheet" href="assets/style.css?v=5">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><a href="rotina.html" style="color:inherit;text-decoration:none;">&larr; Plataforma de Treinamento</a></div>
+    <nav>
+      <a href="rotina.html">Rotina</a>
+      <a href="admin_rotina.html">Admin Rotina</a>
+      <span id="userEmail" class="hint"></span>
+      <button class="btn-outline btn-sm" onclick="logout()">Sair</button>
+    </nav>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="section-title"><h2>Nova rotina</h2></div>
+      <p class="hint">O identificador (id_rotina) é gerado automaticamente pelo banco de dados.</p>
+      <div class="form-row">
+        <div>
+          <label for="novoTitulo">Título</label>
+          <input type="text" id="novoTitulo" placeholder="Ex: Rotina da manhã">
+        </div>
+        <div>
+          <label for="novoDuracao">Duração de execução (hh:mm:ss)</label>
+          <input type="text" id="novoDuracao" placeholder="Ex: 00:30:00 ou 30">
+        </div>
+      </div>
+      <label for="novoUrl">URL do documento (Google Docs)</label>
+      <input type="text" id="novoUrl" placeholder="https://docs.google.com/document/d/.../edit?usp=sharing">
+      <label for="novoDesc">Descrição</label>
+      <textarea id="novoDesc" placeholder="Descrição da rotina (opcional)"></textarea>
+      <button class="btn" style="margin-top:14px;" onclick="criarRotina()">Adicionar rotina</button>
+      <div class="error-msg" id="msgErro"></div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <div class="section-title"><h2>Rotinas cadastradas</h2></div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-id">ID</th>
+            <th>Título</th>
+            <th>URL do documento</th>
+            <th>Descrição</th>
+            <th class="col-duracao">Duração</th>
+            <th class="col-actions-cell">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabelaRotinas"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/supabaseClient.js?v=2"></script>
+  <script src="assets/auth-guard.js?v=2"></script>
+  <script src="assets/duration-utils.js?v=3"></script>
+  <script>
+    let rotinas = [];
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str || "";
+      return div.innerHTML;
+    }
+
+    async function carregarRotinas() {
+      const { data, error } = await supabaseClient
+        .from("rotina")
+        .select("*")
+        .order("id_rotina", { ascending: true });
+
+      if (error) {
+        document.getElementById("tabelaRotinas").innerHTML = `<tr><td colspan="6" class="error-msg">${escapeHtml(error.message)}</td></tr>`;
+        return;
+      }
+      rotinas = data || [];
+      renderTabela();
+    }
+
+    function renderTabela() {
+      const tbody = document.getElementById("tabelaRotinas");
+      if (rotinas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6">Nenhuma rotina cadastrada.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rotinas.map(r => `
+        <tr data-id="${r.id_rotina}">
+          <td class="col-id">#${r.id_rotina}</td>
+          <td><input type="text" value="${escapeHtml(r.titulo)}" data-field="titulo"></td>
+          <td><input type="text" value="${escapeHtml(r.url_rotina)}" data-field="url_rotina"></td>
+          <td><input type="text" value="${escapeHtml(r.descricao || "")}" data-field="descricao"></td>
+          <td class="col-duracao"><input type="text" value="${segundosParaHHMMSS(r.duracao_segundos)}" data-field="duracao" placeholder="00:00:00"></td>
+          <td class="col-actions">
+            <button class="btn-outline btn-sm" onclick="salvarRotina(${r.id_rotina}, this)">Salvar</button>
+            <button class="btn-danger" onclick="excluirRotina(${r.id_rotina})">Excluir</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function criarRotina() {
+      const titulo = document.getElementById("novoTitulo").value.trim();
+      const url_rotina = document.getElementById("novoUrl").value.trim();
+      const descricao = document.getElementById("novoDesc").value.trim();
+      const duracao_segundos = parseDuracaoParaSegundos(document.getElementById("novoDuracao").value.trim());
+      const msg = document.getElementById("msgErro");
+      msg.textContent = "";
+
+      if (!titulo || !url_rotina) {
+        msg.textContent = "Preencha ao menos o título e a URL do documento.";
+        return;
+      }
+
+      // id_rotina não é enviado: o banco (identity) gera automaticamente.
+      const { error } = await supabaseClient.from("rotina").insert({
+        titulo,
+        url_rotina,
+        descricao: descricao || null,
+        duracao_segundos
+      });
+
+      if (error) {
+        msg.textContent = error.message;
+        return;
+      }
+
+      ["novoTitulo", "novoUrl", "novoDesc", "novoDuracao"].forEach(id => document.getElementById(id).value = "");
+      carregarRotinas();
+    }
+
+    async function salvarRotina(id, btn) {
+      const row = btn.closest("tr");
+      const titulo = row.querySelector('[data-field="titulo"]').value.trim();
+      const url_rotina = row.querySelector('[data-field="url_rotina"]').value.trim();
+      const descricao = row.querySelector('[data-field="descricao"]').value.trim();
+      const duracao_segundos = parseDuracaoParaSegundos(row.querySelector('[data-field="duracao"]').value.trim());
+
+      if (!titulo || !url_rotina) {
+        alert("Título e URL são obrigatórios.");
+        return;
+      }
+
+      const { error } = await supabaseClient.from("rotina")
+        .update({ titulo, url_rotina, descricao: descricao || null, duracao_segundos })
+        .eq("id_rotina", id);
+
+      if (error) {
+        alert("Erro ao salvar: " + error.message);
+        return;
+      }
+      carregarRotinas();
+    }
+
+    async function excluirRotina(id) {
+      if (!confirm("Excluir esta rotina?")) return;
+      const { error } = await supabaseClient.from("rotina").delete().eq("id_rotina", id);
+      if (error) {
+        alert("Erro ao excluir: " + error.message);
+        return;
+      }
+      carregarRotinas();
+    }
+
+    (async () => {
+      await requireAuth();
+      initTopbarUser("userEmail");
+      carregarRotinas();
+    })();
+  </script>
+</body>
+</html>
