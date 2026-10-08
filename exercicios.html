@@ -49,6 +49,8 @@
           <option value="nome-desc">Nome (Z–A)</option>
           <option value="qtd-desc">Mais exercícios</option>
           <option value="qtd-asc">Menos exercícios</option>
+          <option value="duracao-desc">Maior duração</option>
+          <option value="duracao-asc">Menor duração</option>
           <option value="categoria-asc">Categoria (A–Z)</option>
         </select>
       </div>
@@ -129,7 +131,8 @@
       const chave = {
         nome: l => l.nome,
         categoria: l => l.categoria || "",
-        qtd: l => Number(l.total_exercicios) || 0
+        qtd: l => Number(l.total_exercicios) || 0,
+        duracao: l => l.duracao_total_segundos || 0
       }[campo];
       filtradas.sort((a, b) => {
         const x = chave(a), y = chave(b);
@@ -153,7 +156,7 @@
             <span class="badge">${l.categoria ? escapeHtml(l.categoria) : "Sem categoria"}</span>
             <h3>${escapeHtml(l.nome)}</h3>
             <span class="meta">${l.total_exercicios} exercício${l.total_exercicios == 1 ? "" : "s"}</span>
-            <span class="meta">Duração total: ${formatarHHMM(l.duracao_total_segundos)} (hh:mm)</span>
+            <span class="meta">Duração total: ${formatarHHMM(l.duracao_total_segundos)}</span>
           </a>
         `).join("")}
       </div>`;
